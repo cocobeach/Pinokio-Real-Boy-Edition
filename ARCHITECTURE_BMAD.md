@@ -329,7 +329,7 @@ PINOKIO_BROWSER_LOG=1 npm start
 
 ## Migration Status
 
-### ✅ Completed (Phase 1)
+### ✅ Completed (Phase 1) - December 2, 2025
 
 - [x] Directory structure created
 - [x] Dependencies installed
@@ -345,21 +345,56 @@ PINOKIO_BROWSER_LOG=1 npm start
 - [x] Entry point (full-bmad.js) created
 - [x] main.js updated with architecture switching
 
-### ⏳ Pending (Phase 2)
+### ✅ Completed (Phase 2) - December 2, 2025
 
-- [ ] InspectorService (complex, deferred)
-- [ ] Terminal UI component (xterm.js in renderer)
-- [ ] Editor UI component (monaco-editor in renderer)
-- [ ] AI Forge wizard (natural language installs)
-- [ ] GAS integration with pinokiod downloads
-- [ ] System tray integration
+- [x] **InspectorService** - Migrated from full.js (~600 lines)
+  - Frame tree traversal and selection
+  - Cross-iframe inspection with postMessage
+  - Element highlighting overlay
+  - Screenshot capture integration
+  - IPC handlers (start-inspector, stop-inspector, capture-screenshot)
+
+- [x] **Terminal UI Component** - Living Interface (xterm.js)
+  - Full xterm.js integration with FitAddon
+  - Connects to PTYController backend via IPC
+  - Bidirectional terminal I/O
+  - Resize handling
+  - Session lifecycle management
+  - Terminal test page (`electron/renderer/terminal-test.html`)
+
+- [x] **Editor UI Component** - Code/Config Editor (monaco-editor)
+  - Multi-language syntax highlighting
+  - Theme support (vs-dark, vs, hc-black)
+  - Format document action
+  - Read-only mode support
+  - File type detection
+
+- [x] **Preload.js APIs** - Complete IPC bridge
+  - Terminal APIs (`window.electronAPI.terminal.*`)
+  - AI APIs (`window.electronAPI.ai.*`)
+  - GAS APIs (`window.electronAPI.gas.*`)
+  - Inspector APIs (existing, preserved)
+
+- [x] **System Tray Integration** - Background mode
+  - Show/hide main window
+  - Quick access from system tray
+  - Context menu (Show, Hide, Quit)
+  - Tray icon with tooltip
+
+### ⏳ Pending (Phase 3 - Future)
+
+- [ ] AI Forge wizard UI (natural language installs)
+- [ ] GAS integration with pinokiod download instructions
 - [ ] Minimal mode refactoring
+- [ ] File system IPC for Editor (save/load via main process)
+- [ ] Terminal session persistence across app restarts
+- [ ] Monaco editor file tree integration
 
-### 📝 Not Migrated (Preserved in full.js)
+### 📝 Not Migrated (Preserved in full.js for now)
 
-- Inspector system (~1000 lines, complex iframe logic)
-- Browser console logging details
-- Prompt window implementation (partially migrated)
+- Screenshot relay system (complex cross-iframe postMessage relay)
+- Some advanced inspector debugging features
+- Browser console logging file writer (low priority)
 
 ---
 

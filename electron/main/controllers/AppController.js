@@ -13,6 +13,7 @@ const WindowManager = require('../services/WindowManager');
 const UpdateService = require('../services/UpdateService');
 const BrowserService = require('../services/BrowserService');
 const AssetManager = require('../services/AssetManager');
+const InspectorService = require('../services/InspectorService');
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -181,6 +182,9 @@ class AppController {
     // Asset Manager (GAS) handlers
     AssetManager.setupIpcHandlers(IpcRouter);
 
+    // Inspector handlers
+    InspectorService.setupIpcHandlers(IpcRouter);
+
     // Custom prompt handler (from original full.js)
     IpcRouter.on('prompt', (eventRet, arg) => {
       const mainWindow = WindowManager.getMainWindow();
@@ -234,6 +238,7 @@ class AppController {
     try {
       // Destroy services in reverse order
       WindowManager.destroy();
+      InspectorService.destroy();
       await AIController.destroy();
       AssetManager.destroy();
       PTYController.destroy();

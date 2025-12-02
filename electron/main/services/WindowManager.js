@@ -3,7 +3,7 @@
  * Handles creation, state persistence, and destruction of browser windows
  */
 
-const { BrowserWindow, session } = require('electron');
+const { BrowserWindow, session, Tray, Menu, nativeImage } = require('electron');
 const windowStateKeeper = require('electron-window-state');
 const path = require('path');
 
@@ -15,6 +15,7 @@ class WindowManager {
     this.pinned = {}; // Pinned windows state
     this.theme = null;
     this.colors = null;
+    this.tray = null; // System tray icon
   }
 
   /**
@@ -283,9 +284,95 @@ class WindowManager {
   }
 
   /**
+   * Create system tray icon
+   * @param {Object} options - Tray options
+   * @param {string} options.iconPath - Path to tray icon
+   * @param {string} options.toolTip - Tooltip text
+   */
+  createTray(options = {}) {
+    if (this.tray) {
+      console.log('[WindowManager] Tray already exists');
+      return this.tray;
+    }
+
+    try {
+      // Default icon path
+      const iconPath = options.iconPath || path.join(__dirname, '../../../assets/icon_small.png');
+
+      // Create tray icon
+      const icon = nativeImage.createFromPath(iconPath);
+      this.tray = new Tray(icon.resize({ width: 16, height: 16 }));
+
+      // Set tooltip
+      this.tray.setToolTip(options.toolTip || 'Pinokio');
+
+      // Create context menu
+      this.updateTrayMenu();
+
+      // Handle click events
+      this.tray.on('click', () => {
+        this.showMainWindow();
+      });
+
+      console.log('[WindowManager] System tray created');
+      return this.tray;
+
+    } catch (error) {
+      console.error('[WindowManager] Failed to create tray:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Update tray context menu
+   */
+  updateTrayMenu() {
+    if (!this.tray) return;
+
+    const menu = Menu.buildFromTemplate([
+      {
+        label: 'Show Pinokio',
+        click: () => {
+          this.showMainWindow();
+        }
+      },
+      {
+        label: 'Hide Pinokio',
+        click: () => {
+          this.hideMainWindow();
+        }
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit',
+        click: () => {
+          const { app } = require('electron');
+          app.quit();
+        }
+      }
+    ]);
+
+    this.tray.setContextMenu(menu);
+  }
+
+  /**
+   * Destroy system tray
+   */
+  destroyTray() {
+    if (this.tray) {
+      this.tray.destroy();
+      this.tray = null;
+      console.log('[WindowManager] System tray destroyed');
+    }
+  }
+
+  /**
    * Cleanup all windows
    */
   destroy() {
+    // Destroy tray
+    this.destroyTray();
+
     // Close splash
     this.closeSplashWindow();
 

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pinokio Terminal Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: #2d2d30;
+      padding: 12px 20px;
+      border-bottom: 1px solid #3e3e42;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 500;
+      color: #cccccc;
+    }
+
+    .header .controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary {
+      background: #0e639c;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #1177bb;
+    }
+
+    .btn-secondary {
+      background: #3c3c3c;
+      color: #cccccc;
+    }
+
+    .btn-secondary:hover {
+      background: #4c4c4c;
+    }
+
+    .btn-danger {
+      background: #c5162c;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #d82d3f;
+    }
+
+    .terminal-container {
+      flex: 1;
+      padding: 10px;
+      overflow: hidden;
+    }
+
+    #terminal {
+      width: 100%;
+      height: 100%;
+    }
+
+    .status-bar {
+      background: #007acc;
+      padding: 4px 20px;
+      font-size: 12px;
+      color: white;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4ec9b0;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .info-panel {
+      position: fixed;
+      top: 60px;
+      right: 20px;
+      background: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 12px;
+      max-width: 300px;
+      display: none;
+    }
+
+    .info-panel.visible {
+      display: block;
+    }
+
+    .info-panel h3 {
+      margin-bottom: 8px;
+      color: #4ec9b0;
+      font-size: 14px;
+    }
+
+    .info-panel p {
+      margin: 4px 0;
+      color: #cccccc;
+    }
+
+    .info-panel code {
+      background: #1e1e1e;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      color: #ce9178;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔧 Pinokio Terminal - Real Boy Edition</h1>
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn">Start Terminal</button>
+      <button class="btn btn-secondary" id="clearBtn">Clear</button>
+      <button class="btn btn-secondary" id="restartBtn">Restart</button>
+      <button class="btn btn-danger" id="killBtn">Kill</button>
+      <button class="btn btn-secondary" id="infoBtn">ℹ️ Info</button>
+    </div>
+  </div>
+
+  <div class="terminal-container">
+    <div id="terminal"></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-indicator">
+      <div class="status-dot"></div>
+      <span id="statusText">Ready</span>
+    </div>
+    <span id="sessionInfo">No active session</span>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <h3>🎯 Terminal Features</h3>
+    <p><strong>Backend:</strong> node-pty (PTYController)</p>
+    <p><strong>Frontend:</strong> xterm.js</p>
+    <p><strong>Architecture:</strong> BMAD</p>
+    <hr style="margin: 10px 0; border: 0; border-top: 1px solid #3e3e42;">
+    <p><strong>Keyboard Shortcuts:</strong></p>
+    <p><code>Ctrl+C</code> - Interrupt process</p>
+    <p><code>Ctrl+L</code> - Clear screen</p>
+    <p><code>Ctrl+D</code> - Exit shell</p>
+    <hr style="margin: 10px 0; border: 0; border-top: 1px solid #3e3e42;">
+    <p><strong>Session:</strong> <span id="infoSessionId">None</span></p>
+    <p><strong>Size:</strong> <span id="infoSize">—</span></p>
+  </div>
+
+  <script type="module">
+    import PinokioTerminal from './components/Terminal.js';
+
+    let terminal = null;
+
+    // Initialize terminal
+    function initTerminal() {
+      const container = document.getElementById('terminal');
+      terminal = new PinokioTerminal(container);
+      updateStatus('Initialized', 'Ready to start');
+    }
+
+    // Start terminal session
+    async function startTerminal() {
+      if (!terminal) {
+        initTerminal();
+      }
+
+      updateStatus('Starting...', 'Creating PTY session');
+      const success = await terminal.start();
+
+      if (success) {
+        updateStatus('Active', `Session ${terminal.sessionId}`);
+        updateInfo();
+        terminal.focus();
+      } else {
+        updateStatus('Failed', 'Could not start session');
+      }
+    }
+
+    // Update status bar
+    function updateStatus(status, info) {
+      document.getElementById('statusText').textContent = status;
+      document.getElementById('sessionInfo').textContent = info;
+    }
+
+    // Update info panel
+    function updateInfo() {
+      const status = terminal?.getStatus();
+      if (status) {
+        document.getElementById('infoSessionId').textContent = status.sessionId || 'None';
+        document.getElementById('infoSize').textContent = status.cols && status.rows
+          ? `${status.cols} × ${status.rows}`
+          : '—';
+      }
+    }
+
+    // Button handlers
+    document.getElementById('startBtn').addEventListener('click', startTerminal);
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      if (terminal) {
+        terminal.clear();
+      }
+    });
+
+    document.getElementById('restartBtn').addEventListener('click', async () => {
+      if (terminal) {
+        updateStatus('Restarting...', 'Killing old session');
+        await terminal.restart();
+        updateStatus('Active', `Session ${terminal.sessionId}`);
+        updateInfo();
+      }
+    });
+
+    document.getElementById('killBtn').addEventListener('click', async () => {
+      if (terminal) {
+        updateStatus('Killing...', 'Terminating session');
+        await terminal.kill();
+        updateStatus('Terminated', 'Session ended');
+        updateInfo();
+      }
+    });
+
+    document.getElementById('infoBtn').addEventListener('click', () => {
+      const panel = document.getElementById('infoPanel');
+      panel.classList.toggle('visible');
+      updateInfo();
+    });
+
+    // Auto-start on load
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        startTerminal();
+      }, 500);
+    });
+
+    // Cleanup on unload
+    window.addEventListener('beforeunload', () => {
+      if (terminal) {
+        terminal.destroy();
+      }
+    });
+  </script>
+</body>
+</html>

@@ -68,6 +68,34 @@ window.electronAPI = {
   captureScreenshot: (screenshotRequest) => {
     return ipcRenderer.invoke('pinokio:capture-screenshot-debug', { screenshotRequest })
   },
+
+  // Terminal APIs (BMAD Architecture)
+  terminal: {
+    create: (options) => ipcRenderer.invoke('terminal:create', options),
+    write: (params) => ipcRenderer.invoke('terminal:write', params),
+    resize: (params) => ipcRenderer.invoke('terminal:resize', params),
+    kill: (params) => ipcRenderer.invoke('terminal:kill', params),
+    list: () => ipcRenderer.invoke('terminal:list'),
+    onData: (callback) => ipcRenderer.on('terminal:data', (event, data) => callback(data)),
+    onExit: (callback) => ipcRenderer.on('terminal:exit', (event, data) => callback(data)),
+  },
+
+  // AI APIs (BMAD Architecture)
+  ai: {
+    initialize: (options) => ipcRenderer.invoke('ai:initialize', options),
+    start: () => ipcRenderer.invoke('ai:start'),
+    stop: () => ipcRenderer.invoke('ai:stop'),
+    ask: (params) => ipcRenderer.invoke('ai:ask', params),
+    status: () => ipcRenderer.invoke('ai:status'),
+  },
+
+  // Global Asset Store APIs (BMAD Architecture)
+  gas: {
+    exists: (params) => ipcRenderer.invoke('gas:exists', params),
+    link: (params) => ipcRenderer.invoke('gas:link', params),
+    register: (params) => ipcRenderer.invoke('gas:register', params),
+    stats: () => ipcRenderer.invoke('gas:stats'),
+  },
 }
 
 ;(function initInspector() {
