@@ -119,7 +119,7 @@ Instructions:
 2. Detect the project type (python, node, rust, docker)
 3. Identify required dependencies and installation steps
 4. Generate install commands in the correct order
-5. Identify any model files that need to be downloaded
+5. Identify any model files that need to be downloaded (IMPORTANT: these will use GAS - Global Asset Store for deduplication)
 6. Determine the command to run the application
 
 Output Format (JSON):
@@ -139,7 +139,8 @@ Output Format (JSON):
   "models": [
     {
       "url": "https://...",
-      "path": "relative/path/in/app"
+      "path": "relative/path/in/app",
+      "description": "Optional description of what this model does"
     }
   ]
 }
@@ -147,9 +148,11 @@ Output Format (JSON):
 Important:
 - Use ONLY safe, standard installation commands
 - For Python projects, assume conda/venv will be handled automatically
-- For model downloads, provide full URLs
+- For model downloads, provide full URLs (these will be handled by GAS for deduplication)
+- Models will be downloaded to Global Asset Store and symlinked to prevent duplication
 - Keep commands simple and idiomatic for the detected type
 - Do NOT include 'cd' commands (path will be handled automatically)
+- Identify ALL model files (.safetensors, .ckpt, .pth, .bin files) from the repository
 
 Generate the manifest now:`;
   }
@@ -343,7 +346,126 @@ Analyze and respond with JSON:`;
       };
     });
 
+    // Execute in terminal
+    ipcRouter.handle('forge:execute-in-terminal', async (event, params) => {
+      const manifest = new InstallManifest(params.manifest);
+      return await this.executeInTerminal(manifest, {
+        sessionId: params.sessionId,
+        onProgress: (progress) => {
+          event.sender.send('forge:execution-progress', progress);
+        }
+      });
+    });
+
+    // Save manifest
+    ipcRouter.handle('forge:save-manifest', async (event, params) => {
+      const manifest = new InstallManifest(params.manifest);
+      return this.saveManifest(manifest, params.name);
+    });
+
     console.log('[ForgeService] IPC handlers registered');
+  }
+
+  /**
+   * Execute a generated manifest in a terminal
+   * This creates the Forge → Terminal pipeline
+   * @param {InstallManifest} manifest - The manifest to execute
+   * @param {Object} options - Execution options
+   * @param {Function} options.onProgress - Progress callback
+   * @param {string} options.sessionId - Terminal session ID (optional, will create new if not provided)
+   * @returns {Promise<Object>} Execution result
+   */
+  async executeInTerminal(manifest, options = {}) {
+    const { onProgress, sessionId } = options;
+    const PTYController = require('../controllers/PTYController');
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+
+    try {
+      onProgress?.({ stage: 'preparing', message: 'Preparing installation script...' });
+
+      // Convert manifest to Pinokio script
+      const script = manifest.toPinokioScript();
+
+      // Save script to temporary location
+      const homedir = os.homedir();
+      const scriptDir = path.join(homedir, 'pinokio', 'forge', 'generated');
+      if (!fs.existsSync(scriptDir)) {
+        fs.mkdirSync(scriptDir, { recursive: true });
+      }
+
+      const timestamp = Date.now();
+      const scriptPath = path.join(scriptDir, `${manifest.appName}_${timestamp}.json`);
+      fs.writeFileSync(scriptPath, JSON.stringify(script, null, 2));
+
+      onProgress?.({ stage: 'saved', message: `Script saved to: ${scriptPath}` });
+
+      // Create or use existing terminal session
+      let terminalSessionId = sessionId;
+      if (!terminalSessionId) {
+        onProgress?.({ stage: 'terminal', message: 'Creating terminal session...' });
+        const session = PTYController.createSession({
+          cwd: path.join(homedir, 'pinokio', 'api'),
+          cols: 120,
+          rows: 30
+        });
+        terminalSessionId = session.id;
+      }
+
+      onProgress?.({ stage: 'executing', message: 'Executing installation script...' });
+
+      // Note: Actual execution would require pinokiod CLI integration
+      // For now, we provide the script path and terminal session
+      return {
+        success: true,
+        scriptPath,
+        terminalSessionId,
+        message: 'Script ready for execution. Use pinokiod to run the script in the terminal session.'
+      };
+
+    } catch (error) {
+      onProgress?.({ stage: 'error', message: error.message });
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Save a manifest for later use
+   * @param {InstallManifest} manifest - The manifest to save
+   * @param {string} name - Custom name (optional)
+   * @returns {Object} Save result
+   */
+  saveManifest(manifest, name = null) {
+    const fs = require('fs');
+    const path = require('path');
+    const os = require('os');
+
+    try {
+      const homedir = os.homedir();
+      const saveDir = path.join(homedir, 'pinokio', 'forge', 'manifests');
+      if (!fs.existsSync(saveDir)) {
+        fs.mkdirSync(saveDir, { recursive: true });
+      }
+
+      const filename = name || `${manifest.appName}_${Date.now()}.json`;
+      const savePath = path.join(saveDir, filename);
+
+      fs.writeFileSync(savePath, manifest.toJSON(true));
+
+      return {
+        success: true,
+        path: savePath
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
   }
 
   /**

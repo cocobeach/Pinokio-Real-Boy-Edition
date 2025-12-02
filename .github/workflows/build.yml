@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-
-#on: workflow_dispatch
+      - claude/refactor-bmad-architecture-*  # Allow builds on BMAD refactor branches
+  workflow_dispatch:  # Allow manual builds for testing
 
 jobs:
 

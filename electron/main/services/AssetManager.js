@@ -208,8 +208,8 @@ class AssetManager {
   }
 
   /**
-   * Download asset to GAS (stub - actual download handled by pinokiod)
-   * This method would be called by pinokiod to register a downloaded asset
+   * Register a downloaded asset to GAS
+   * This method moves a downloaded file to GAS or removes it if already present
    * @param {string} url - Source URL
    * @param {string} localPath - Path where file was downloaded
    * @returns {Object} Registration result
@@ -245,6 +245,150 @@ class AssetManager {
     } catch (error) {
       console.error('[AssetManager] Error registering asset:', error);
       return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Check if download is needed and provide GAS-aware download plan
+   * @param {string} url - Source URL
+   * @param {string} targetPath - Where the file should end up
+   * @returns {Object} Download plan
+   */
+  getDownloadPlan(url, targetPath) {
+    const gasFilePath = this.getGasPathFromUrl(url);
+    const existsInGas = fs.existsSync(gasFilePath);
+    const existsAtTarget = fs.existsSync(targetPath);
+
+    if (existsInGas) {
+      // File exists in GAS, no download needed
+      if (existsAtTarget) {
+        return {
+          action: 'skip',
+          reason: 'file_exists_at_target',
+          gasPath: gasFilePath
+        };
+      } else {
+        return {
+          action: 'link',
+          reason: 'exists_in_gas',
+          gasPath: gasFilePath,
+          targetPath
+        };
+      }
+    } else {
+      // Need to download
+      return {
+        action: 'download',
+        reason: 'not_in_gas',
+        downloadPath: gasFilePath, // Download directly to GAS
+        targetPath
+      };
+    }
+  }
+
+  /**
+   * Execute GAS-aware download plan
+   * Downloads to GAS if needed, then links to target
+   * @param {Object} plan - Download plan from getDownloadPlan
+   * @param {Function} downloadFn - Download function (url, destPath) => Promise
+   * @param {Function} onProgress - Progress callback
+   * @returns {Promise<Object>} Result
+   */
+  async executeDownloadPlan(plan, downloadFn, onProgress) {
+    try {
+      switch (plan.action) {
+        case 'skip':
+          onProgress?.({ stage: 'skip', message: 'File already exists at target' });
+          return { success: true, action: 'skipped', reason: plan.reason };
+
+        case 'link':
+          onProgress?.({ stage: 'linking', message: 'Linking from GAS to target' });
+          const linkResult = this.linkAsset(plan.gasPath, plan.targetPath);
+          return { success: linkResult.success, action: 'linked', method: linkResult.method };
+
+        case 'download':
+          onProgress?.({ stage: 'downloading', message: 'Downloading to GAS' });
+
+          // Ensure GAS directory exists
+          const gasDir = path.dirname(plan.downloadPath);
+          if (!fs.existsSync(gasDir)) {
+            fs.mkdirSync(gasDir, { recursive: true });
+          }
+
+          // Download directly to GAS
+          await downloadFn(plan.downloadPath, onProgress);
+
+          // Link to target if different from GAS
+          if (plan.targetPath && plan.targetPath !== plan.downloadPath) {
+            onProgress?.({ stage: 'linking', message: 'Linking from GAS to target' });
+            const linkResult = this.linkAsset(plan.downloadPath, plan.targetPath);
+            return {
+              success: true,
+              action: 'downloaded_and_linked',
+              gasPath: plan.downloadPath,
+              method: linkResult.method
+            };
+          }
+
+          return { success: true, action: 'downloaded', gasPath: plan.downloadPath };
+
+        default:
+          throw new Error(`Unknown action: ${plan.action}`);
+      }
+    } catch (error) {
+      console.error('[AssetManager] Error executing download plan:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Find duplicate assets by content hash
+   * Useful for detecting duplicate models with different URLs
+   * @param {string} filePath - Path to file to check
+   * @returns {Promise<Array>} List of duplicate paths in GAS
+   */
+  async findDuplicates(filePath) {
+    try {
+      const fileHash = await this.computeFileHash(filePath);
+      const duplicates = [];
+
+      const walkGas = (dir) => {
+        const files = fs.readdirSync(dir);
+
+        for (const file of files) {
+          const fullPath = path.join(dir, file);
+          const stat = fs.statSync(fullPath);
+
+          if (stat.isDirectory()) {
+            walkGas(fullPath);
+          } else {
+            // Skip the file itself
+            if (fullPath === filePath) continue;
+
+            // Quick size check before computing hash
+            if (stat.size !== fs.statSync(filePath).size) continue;
+
+            // Compute hash and compare
+            const hash = crypto.createHash('sha256');
+            const data = fs.readFileSync(fullPath);
+            hash.update(data);
+            const otherHash = hash.digest('hex');
+
+            if (otherHash === fileHash) {
+              duplicates.push(fullPath);
+            }
+          }
+        }
+      };
+
+      if (fs.existsSync(this.gasPath)) {
+        walkGas(this.gasPath);
+      }
+
+      return duplicates;
+    } catch (error) {
+      console.error('[AssetManager] Error finding duplicates:', error);
+      return [];
     }
   }
 
@@ -318,6 +462,16 @@ class AssetManager {
     // Register downloaded asset
     ipcRouter.handle('gas:register', async (event, { url, localPath }) => {
       return this.registerAsset(url, localPath);
+    });
+
+    // Get download plan
+    ipcRouter.handle('gas:get-download-plan', async (event, { url, targetPath }) => {
+      return this.getDownloadPlan(url, targetPath);
+    });
+
+    // Find duplicates by hash
+    ipcRouter.handle('gas:find-duplicates', async (event, { filePath }) => {
+      return await this.findDuplicates(filePath);
     });
 
     // Get stats

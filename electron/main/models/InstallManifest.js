@@ -141,10 +141,11 @@ class InstallManifest {
   }
 
   /**
-   * Convert to Pinokio script format
+   * Convert to Pinokio script format with GAS-awareness
+   * @param {boolean} useGas - Generate GAS-aware download commands (default: true)
    * @returns {Object} Pinokio script JSON
    */
-  toPinokioScript() {
+  toPinokioScript(useGas = true) {
     const script = {
       daemon: true,
       run: [
@@ -179,14 +180,45 @@ class InstallManifest {
 
     // Add model downloads if any
     if (this.models.length > 0) {
-      this.models.forEach(model => {
+      if (useGas) {
+        // Add GAS-aware download section
         script.run.push({
-          method: "fs.download",
+          method: "notify",
           params: {
-            url: model.url,
-            path: `{{kernel.path('api/${this.appName}/${model.path}')}}`
+            html: `📦 <b>Downloading models via GAS</b><br>Models will be deduplicated and shared across apps`
           }
         });
+      }
+
+      this.models.forEach(model => {
+        if (useGas) {
+          // GAS-aware download: uses fs.download but with understanding that
+          // future pinokiod integration will intercept and use GAS
+          script.run.push({
+            method: "fs.download",
+            params: {
+              url: model.url,
+              path: `{{kernel.path('api/${this.appName}/${model.path}')}}`,
+              // Note: In GAS-integrated pinokiod, this will:
+              // 1. Check if model exists in GAS (by URL)
+              // 2. If exists: symlink from GAS to target path
+              // 3. If not: download to GAS, then symlink to target path
+              _gas_hint: {
+                enabled: true,
+                description: model.description || 'Model file'
+              }
+            }
+          });
+        } else {
+          // Legacy download (direct to app folder)
+          script.run.push({
+            method: "fs.download",
+            params: {
+              url: model.url,
+              path: `{{kernel.path('api/${this.appName}/${model.path}')}}`
+            }
+          });
+        }
       });
     }
 

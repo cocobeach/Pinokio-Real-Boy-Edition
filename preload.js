@@ -94,16 +94,21 @@ window.electronAPI = {
     exists: (params) => ipcRenderer.invoke('gas:exists', params),
     link: (params) => ipcRenderer.invoke('gas:link', params),
     register: (params) => ipcRenderer.invoke('gas:register', params),
+    getDownloadPlan: (params) => ipcRenderer.invoke('gas:get-download-plan', params),
+    findDuplicates: (params) => ipcRenderer.invoke('gas:find-duplicates', params),
     stats: () => ipcRenderer.invoke('gas:stats'),
   },
 
-  // AI Forge APIs (BMAD Architecture - Phase 3)
+  // AI Forge APIs (BMAD Architecture - Phase 3 & 4)
   forge: {
     create: (params) => ipcRenderer.invoke('forge:create', params),
     analyzeError: (params) => ipcRenderer.invoke('forge:analyze-error', params),
     history: (params) => ipcRenderer.invoke('forge:history', params),
     active: () => ipcRenderer.invoke('forge:active'),
+    executeInTerminal: (params) => ipcRenderer.invoke('forge:execute-in-terminal', params),
+    saveManifest: (params) => ipcRenderer.invoke('forge:save-manifest', params),
     onProgress: (callback) => ipcRenderer.on('forge:progress', (event, data) => callback(data)),
+    onExecutionProgress: (callback) => ipcRenderer.on('forge:execution-progress', (event, data) => callback(data)),
   },
 }
 
