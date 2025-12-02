@@ -14,6 +14,7 @@ const UpdateService = require('../services/UpdateService');
 const BrowserService = require('../services/BrowserService');
 const AssetManager = require('../services/AssetManager');
 const InspectorService = require('../services/InspectorService');
+const ForgeService = require('../services/ForgeService');
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -185,6 +186,9 @@ class AppController {
     // Inspector handlers
     InspectorService.setupIpcHandlers(IpcRouter);
 
+    // Forge handlers (AI-powered installation generation)
+    ForgeService.setupIpcHandlers(IpcRouter);
+
     // Custom prompt handler (from original full.js)
     IpcRouter.on('prompt', (eventRet, arg) => {
       const mainWindow = WindowManager.getMainWindow();
@@ -238,6 +242,7 @@ class AppController {
     try {
       // Destroy services in reverse order
       WindowManager.destroy();
+      ForgeService.destroy();
       InspectorService.destroy();
       await AIController.destroy();
       AssetManager.destroy();

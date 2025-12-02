@@ -381,14 +381,48 @@ PINOKIO_BROWSER_LOG=1 npm start
   - Context menu (Show, Hide, Quit)
   - Tray icon with tooltip
 
-### ⏳ Pending (Phase 3 - Future)
+### ✅ Completed (Phase 3) - December 2, 2025
 
-- [ ] AI Forge wizard UI (natural language installs)
-- [ ] GAS integration with pinokiod download instructions
+- [x] **InstallManifest Data Model** - AI-generated installation blueprints
+  - Structured JSON format for installation plans
+  - Validation logic (required fields, URL formats, command types)
+  - Safety checks (dangerous command detection)
+  - Conversion to Pinokio script format
+  - File: `electron/main/models/InstallManifest.js`
+
+- [x] **ForgeService** - The AI Architect
+  - Natural language → InstallManifest generation
+  - AI-powered repository analysis
+  - Error log analysis and fix suggestions
+  - Forge history tracking
+  - Progress event streaming
+  - IPC handlers: `forge:create`, `forge:analyze-error`, `forge:history`
+  - File: `electron/main/services/ForgeService.js`
+
+- [x] **AI Forge Wizard UI** - Beautiful installation generator
+  - 4-step wizard interface (Input → Processing → Review → Complete)
+  - Real-time AI progress indicators
+  - Manifest preview with syntax highlighting
+  - Safety warning display
+  - Forge history sidebar
+  - Copy-to-clipboard functionality
+  - File: `electron/renderer/forge-wizard.html`
+
+- [x] **Forge APIs in preload.js**
+  - `forge.create({ input })` - Generate manifest from natural language
+  - `forge.analyzeError({ errorLog, originalManifest })` - AI error recovery
+  - `forge.history({ limit })` - Get forge history
+  - `forge.onProgress(callback)` - Real-time progress updates
+
+### ⏳ Pending (Phase 4 - Future Enhancements)
+
+- [ ] GAS integration with pinokiod download instructions (Deep integration)
 - [ ] Minimal mode refactoring
 - [ ] File system IPC for Editor (save/load via main process)
 - [ ] Terminal session persistence across app restarts
 - [ ] Monaco editor file tree integration
+- [ ] Forge → Terminal pipeline (auto-execute generated scripts)
+- [ ] Model recommendation engine
 
 ### 📝 Not Migrated (Preserved in full.js for now)
 

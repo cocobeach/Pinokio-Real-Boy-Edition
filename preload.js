@@ -96,6 +96,15 @@ window.electronAPI = {
     register: (params) => ipcRenderer.invoke('gas:register', params),
     stats: () => ipcRenderer.invoke('gas:stats'),
   },
+
+  // AI Forge APIs (BMAD Architecture - Phase 3)
+  forge: {
+    create: (params) => ipcRenderer.invoke('forge:create', params),
+    analyzeError: (params) => ipcRenderer.invoke('forge:analyze-error', params),
+    history: (params) => ipcRenderer.invoke('forge:history', params),
+    active: () => ipcRenderer.invoke('forge:active'),
+    onProgress: (callback) => ipcRenderer.on('forge:progress', (event, data) => callback(data)),
+  },
 }
 
 ;(function initInspector() {
