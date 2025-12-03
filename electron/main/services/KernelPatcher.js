@@ -210,6 +210,22 @@ class KernelPatcher {
         console.log(`[KernelPatcher] 🎯 Intercepted download: ${url}`);
         console.log(`[KernelPatcher] Target path: ${targetPath}`);
 
+        // BYPASS: System Binaries & Installers
+        // System files (Conda, Git, Node installers) must be handled natively by pinokiod
+        // Installing them via GAS breaks the installation logic (symlinks/moves break .exe/.sh execution)
+        const normalizedPath = targetPath.toLowerCase().replace(/\\/g, '/');
+        const isSystemFile = normalizedPath.includes('/pinokio/bin/') ||
+                            normalizedPath.includes('/pinokio/cache/') ||
+                            normalizedPath.includes('\\pinokio\\bin\\') ||
+                            normalizedPath.includes('\\pinokio\\cache\\');
+
+        if (isSystemFile) {
+          console.log(`[KernelPatcher] 🛡️  SYSTEM DOWNLOAD detected (${path.basename(targetPath)}). Bypassing GAS.`);
+          console.log('[KernelPatcher] Reason: System binaries must be installed natively by pinokiod.');
+          self.fallbackCount++;
+          return await self.originalDownload(req, ondata, kernel);
+        }
+
         // Get GAS download plan
         const plan = AssetManager.getDownloadPlan(url, targetPath);
         console.log(`[KernelPatcher] GAS Plan: ${plan.action} (${plan.reason})`);

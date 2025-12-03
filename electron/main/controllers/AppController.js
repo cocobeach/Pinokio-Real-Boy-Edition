@@ -51,7 +51,13 @@ class AppController {
       // Start Pinokiod server
       await this.startPinokiod();
 
+      // CRITICAL: Check System Environment Health
+      // Verify that system binaries (Conda, Git, Node) are installed or being installed
+      await this.checkSystemHealth();
+
       // Phase 5: Apply Deep Hook to intercept all downloads
+      // NOTE: Deep Hook now bypasses system binaries (pinokio/bin, pinokio/cache)
+      // This ensures Conda/Git/Node installers are handled natively by pinokiod
       await this.applyKernelPatch();
 
       // Show splash screen
@@ -134,6 +140,46 @@ class AppController {
     this.rootUrl = `http://localhost:${this.port}`;
 
     console.log(`[AppController] Pinokiod server started on port ${this.port}`);
+  }
+
+  /**
+   * Check system environment health
+   * Verifies that system binaries (Conda, Git, Node) exist or are being installed
+   * Critical for first-run scenarios where pinokiod auto-installs dependencies
+   */
+  async checkSystemHealth() {
+    const path = require('path');
+    const fs = require('fs');
+    const os = require('os');
+
+    console.log('[AppController] === System Environment Health Check ===');
+
+    const homedir = os.homedir();
+    const binPath = path.join(homedir, 'pinokio', 'bin');
+    const condaPath = path.join(binPath, 'miniconda');
+    const gitPath = path.join(binPath, 'git');
+    const nodePath = path.join(binPath, 'nodejs');
+
+    // Check each system component
+    const condaExists = fs.existsSync(condaPath);
+    const gitExists = fs.existsSync(gitPath);
+    const nodeExists = fs.existsSync(nodePath);
+
+    console.log('[AppController] System Binary Status:');
+    console.log(`  - Miniconda: ${condaExists ? '✅ Installed' : '⚠️  Missing (will auto-install)'}`);
+    console.log(`  - Git: ${gitExists ? '✅ Installed' : '⚠️  Missing (will auto-install)'}`);
+    console.log(`  - Node.js: ${nodeExists ? '✅ Installed' : '⚠️  Missing (will auto-install)'}`);
+
+    if (!condaExists || !gitExists || !nodeExists) {
+      console.log('[AppController] ⚠️  System environment incomplete.');
+      console.log('[AppController] Pinokiod will trigger auto-installation on first run.');
+      console.log('[AppController] IMPORTANT: KernelPatcher bypasses bin/ and cache/ to allow native installation.');
+      console.log('[AppController] This is NORMAL for first-run scenarios.');
+    } else {
+      console.log('[AppController] ✅ System environment complete.');
+    }
+
+    console.log('[AppController] === Health Check Complete ===');
   }
 
   /**

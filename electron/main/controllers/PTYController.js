@@ -14,6 +14,60 @@ class PTYController {
   }
 
   /**
+   * Get augmented environment variables with Pinokio system paths
+   * Ensures terminals can access Conda, Git, Node after they're installed
+   * @param {Object} baseEnv - Base environment variables (defaults to process.env)
+   * @returns {Object} Augmented environment with system paths
+   */
+  getAugmentedEnv(baseEnv = process.env) {
+    const path = require('path');
+    const fs = require('fs');
+    const homedir = os.homedir();
+
+    // Build system paths
+    const binPath = path.join(homedir, 'pinokio', 'bin');
+    const condaPath = path.join(binPath, 'miniconda');
+    const gitPath = path.join(binPath, 'git');
+    const nodePath = path.join(binPath, 'nodejs');
+
+    // Check which paths exist
+    const systemPaths = [];
+
+    if (fs.existsSync(condaPath)) {
+      // Add conda binaries to PATH
+      if (os.platform() === 'win32') {
+        systemPaths.push(condaPath);
+        systemPaths.push(path.join(condaPath, 'Scripts'));
+        systemPaths.push(path.join(condaPath, 'Library', 'bin'));
+      } else {
+        systemPaths.push(path.join(condaPath, 'bin'));
+      }
+      console.log('[PTYController] Conda environment detected, adding to PATH');
+    }
+
+    if (fs.existsSync(gitPath)) {
+      systemPaths.push(os.platform() === 'win32' ? path.join(gitPath, 'cmd') : path.join(gitPath, 'bin'));
+      console.log('[PTYController] Git environment detected, adding to PATH');
+    }
+
+    if (fs.existsSync(nodePath)) {
+      systemPaths.push(nodePath);
+      console.log('[PTYController] Node environment detected, adding to PATH');
+    }
+
+    // Augment PATH if we found system binaries
+    const augmentedEnv = { ...baseEnv };
+    if (systemPaths.length > 0) {
+      const pathSeparator = os.platform() === 'win32' ? ';' : ':';
+      const currentPath = baseEnv.PATH || baseEnv.path || '';
+      augmentedEnv.PATH = systemPaths.join(pathSeparator) + pathSeparator + currentPath;
+      console.log('[PTYController] Augmented PATH with Pinokio system binaries');
+    }
+
+    return augmentedEnv;
+  }
+
+  /**
    * Create a new PTY session
    * @param {Object} options - PTY options
    * @param {string} options.shell - Shell to spawn (default: system shell)
@@ -29,13 +83,16 @@ class PTYController {
     // Determine shell
     const shell = options.shell || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash');
 
+    // Get augmented environment with Pinokio system paths
+    const augmentedEnv = this.getAugmentedEnv({ ...process.env, ...options.env });
+
     // Create PTY
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: options.cols || 80,
       rows: options.rows || 30,
       cwd: options.cwd || process.env.HOME || process.cwd(),
-      env: { ...process.env, ...options.env }
+      env: augmentedEnv
     });
 
     // Store session
