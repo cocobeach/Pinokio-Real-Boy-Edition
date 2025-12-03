@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pinokio: Command Center</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body, html {
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    #command-center-shell {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* LEFT PANE: Native Sidebar */
+    #native-sidebar {
+      width: 60px;
+      min-width: 60px;
+      background: linear-gradient(180deg, #2d2d2d 0%, #1a1a1a 100%);
+      border-right: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px 0;
+      z-index: 100;
+    }
+
+    #native-sidebar .nav-icon {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      font-size: 24px;
+    }
+
+    #native-sidebar .nav-icon:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    #native-sidebar .nav-icon.active {
+      background: rgba(59, 130, 246, 0.3);
+      border: 1px solid rgba(59, 130, 246, 0.5);
+    }
+
+    /* MIDDLE PANE: Web App + Terminal */
+    #middle-stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Webview Container */
+    #pinokiod-webview {
+      width: 100%;
+      flex: 1;
+      border: none;
+      background: #fff;
+    }
+
+    /* Terminal Drawer */
+    #terminal-drawer {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 0;
+      background: #1e1e1e;
+      border-top: 1px solid #333;
+      transition: height 0.3s ease;
+      overflow: hidden;
+      z-index: 50;
+    }
+
+    #terminal-drawer.open {
+      height: 40vh;
+    }
+
+    #terminal-drawer.maximized {
+      height: 100%;
+    }
+
+    #terminal-header {
+      height: 36px;
+      background: #252526;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      cursor: move;
+      user-select: none;
+    }
+
+    #terminal-header .title {
+      font-size: 12px;
+      font-weight: 500;
+      color: #cccccc;
+    }
+
+    #terminal-header .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    #terminal-header .control-btn {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s ease;
+    }
+
+    #terminal-header .control-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    #terminal-content {
+      height: calc(100% - 36px);
+      padding: 12px;
+      overflow: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Loading State */
+    #loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 9999;
+      opacity: 1;
+      transition: opacity 0.3s ease;
+    }
+
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #loading-overlay .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(59, 130, 246, 0.2);
+      border-top-color: rgba(59, 130, 246, 0.8);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    #loading-overlay .loading-text {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #888;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Utility */
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Initializing Pinokio Command Center...</div>
+  </div>
+
+  <!-- Command Center Shell -->
+  <div id="command-center-shell">
+    <!-- LEFT: Native Sidebar -->
+    <div id="native-sidebar">
+      <div class="nav-icon active" id="nav-home" title="Home">🏠</div>
+      <div class="nav-icon" id="nav-terminal" title="Terminal">⌨️</div>
+      <div class="nav-icon" id="nav-settings" title="Settings">⚙️</div>
+    </div>
+
+    <!-- MIDDLE: Web App + Terminal Drawer -->
+    <div id="middle-stage">
+      <!-- Pinokiod Web App -->
+      <webview
+        id="pinokiod-webview"
+        src="about:blank"
+        allowpopups
+        nodeintegration="false"
+        webpreferences="contextIsolation=true"
+      ></webview>
+
+      <!-- Terminal Drawer (Hidden by default) -->
+      <div id="terminal-drawer">
+        <div id="terminal-header">
+          <div class="title">Terminal</div>
+          <div class="controls">
+            <div class="control-btn" id="terminal-minimize" title="Minimize">−</div>
+            <div class="control-btn" id="terminal-maximize" title="Maximize">□</div>
+            <div class="control-btn" id="terminal-close" title="Close">×</div>
+          </div>
+        </div>
+        <div id="terminal-content">
+          <div style="color: #888;">Terminal ready. Waiting for session...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    console.log('[Command Center] Initializing...');
+
+    // Get URL parameters passed from main process
+    const urlParams = new URLSearchParams(window.location.search);
+    const rootUrl = urlParams.get('rootUrl') || 'http://localhost:3000';
+
+    console.log('[Command Center] Root URL:', rootUrl);
+
+    // Initialize webview
+    const webview = document.getElementById('pinokiod-webview');
+    const terminalDrawer = document.getElementById('terminal-drawer');
+    const terminalContent = document.getElementById('terminal-content');
+    const loadingOverlay = document.getElementById('loading-overlay');
+
+    // Wait for webview to be ready
+    webview.addEventListener('dom-ready', () => {
+      console.log('[Command Center] Webview DOM ready');
+      // Hide loading overlay after a short delay
+      setTimeout(() => {
+        loadingOverlay.classList.add('hidden');
+      }, 500);
+    });
+
+    webview.addEventListener('did-fail-load', (event) => {
+      console.error('[Command Center] Webview failed to load:', event);
+      terminalContent.innerHTML = `<div style="color: #ff6b6b;">Failed to load Pinokio server at ${rootUrl}</div>`;
+    });
+
+    // Load the Pinokio web app
+    console.log('[Command Center] Loading webview:', rootUrl);
+    webview.src = rootUrl;
+
+    // Terminal Drawer Controls
+    let terminalState = 'closed'; // closed, open, maximized
+
+    function openTerminal() {
+      terminalDrawer.classList.add('open');
+      terminalDrawer.classList.remove('maximized');
+      terminalState = 'open';
+    }
+
+    function maximizeTerminal() {
+      terminalDrawer.classList.add('maximized');
+      terminalDrawer.classList.add('open');
+      terminalState = 'maximized';
+    }
+
+    function minimizeTerminal() {
+      terminalDrawer.classList.remove('maximized');
+      terminalDrawer.classList.add('open');
+      terminalState = 'open';
+    }
+
+    function closeTerminal() {
+      terminalDrawer.classList.remove('open', 'maximized');
+      terminalState = 'closed';
+    }
+
+    document.getElementById('terminal-minimize').addEventListener('click', minimizeTerminal);
+    document.getElementById('terminal-maximize').addEventListener('click', () => {
+      if (terminalState === 'maximized') {
+        minimizeTerminal();
+      } else {
+        maximizeTerminal();
+      }
+    });
+    document.getElementById('terminal-close').addEventListener('click', closeTerminal);
+
+    // Navigation Icons
+    document.getElementById('nav-home').addEventListener('click', () => {
+      console.log('[Command Center] Navigate to Home');
+      webview.src = rootUrl;
+    });
+
+    document.getElementById('nav-terminal').addEventListener('click', () => {
+      console.log('[Command Center] Toggle Terminal');
+      if (terminalState === 'closed') {
+        openTerminal();
+      } else {
+        closeTerminal();
+      }
+    });
+
+    document.getElementById('nav-settings').addEventListener('click', () => {
+      console.log('[Command Center] Navigate to Settings');
+      webview.src = rootUrl + '/settings';
+    });
+
+    // CRITICAL: IPC Handler for Terminal Hijack Prevention
+    if (window.electronAPI && window.electronAPI.onCommandCenter) {
+      console.log('[Command Center] Registering IPC handlers');
+
+      window.electronAPI.onCommandCenter('attach-terminal', (payload) => {
+        console.log('[Command Center] Terminal attach requested:', payload);
+
+        // Open terminal drawer
+        openTerminal();
+
+        // Display terminal session info
+        terminalContent.innerHTML = `
+          <div style="color: #4ec9b0;">✓ Terminal session attached</div>
+          <div style="color: #888; margin-top: 8px;">Session ID: ${payload.sessionId}</div>
+          <div style="color: #888;">Original URL: ${payload.url}</div>
+          <div style="color: #ce9178; margin-top: 12px;">Terminal Hijack Prevented!</div>
+          <div style="color: #888; margin-top: 4px;">The web app tried to navigate the entire window to a log page.</div>
+          <div style="color: #888;">This has been intercepted and the terminal drawer opened instead.</div>
+        `;
+
+        // TODO: When PTY integration is ready, attach to actual terminal session here
+        // PTYController.attach(payload.sessionId);
+      });
+    } else {
+      console.warn('[Command Center] electronAPI.onCommandCenter not available');
+    }
+
+    console.log('[Command Center] Initialization complete');
+  </script>
+</body>
+</html>

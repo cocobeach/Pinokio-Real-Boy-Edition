@@ -187,6 +187,7 @@ class BrowserService {
 
   /**
    * Setup navigation handling
+   * Epic 6: Intercepts log page navigation to prevent Terminal Hijack
    * @param {WebContents} webContents - WebContents instance
    */
   setupNavigation(webContents) {
@@ -197,10 +198,47 @@ class BrowserService {
         const host = new URL(url).host;
         const localhost = new URL(this.rootUrl).host;
 
+        // External link handling
         if (host !== localhost) {
           event.preventDefault();
           shell.openExternal(url);
+          return;
         }
+
+        // EPIC 6: Terminal Hijack Prevention
+        // Intercept navigation to log pages (/run/* or /log/*)
+        // Instead of hijacking the entire window, send IPC to Command Center
+        const pathname = new URL(url).pathname;
+
+        if (pathname.startsWith('/run/') || pathname.startsWith('/log/')) {
+          event.preventDefault();
+
+          // Extract session ID from URL (e.g., /run/SESSION_ID/log)
+          const pathParts = pathname.split('/').filter(p => p.length > 0);
+          const sessionId = pathParts[1] || 'unknown';
+
+          console.log(`[BrowserService] 🛡️  Terminal Hijack prevented for session: ${sessionId}`);
+          console.log(`[BrowserService] Original URL: ${url}`);
+          console.log('[BrowserService] Signaling Command Center to open Terminal Drawer');
+
+          // Send IPC to main window (Command Center shell)
+          const WindowManager = require('./WindowManager');
+          const mainWindow = WindowManager.getMainWindow();
+
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('command-center:attach-terminal', {
+              sessionId,
+              url,
+              pathname
+            });
+          } else {
+            console.error('[BrowserService] Main window not available for IPC');
+          }
+
+          return;
+        }
+
+        // Allow all other internal navigation
       }
     });
   }

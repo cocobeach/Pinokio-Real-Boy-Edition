@@ -242,9 +242,21 @@ class AppController {
 
   /**
    * Create main application window
+   * Epic 6: Loads local Command Center shell instead of remote web app directly
    */
   async createMainWindow() {
-    const mainWindow = WindowManager.createMainWindow(this.rootUrl, {
+    const path = require('path');
+
+    // EPIC 6: Load local Command Center shell HTML
+    // The shell contains the webview that will load the actual Pinokio web app
+    const localShellPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
+
+    // Pass rootUrl as query parameter so the shell knows where to load the web app
+    const shellUrl = `file://${localShellPath}?rootUrl=${encodeURIComponent(this.rootUrl)}`;
+
+    console.log('[AppController] Loading Command Center shell:', shellUrl);
+
+    const mainWindow = WindowManager.createMainWindow(shellUrl, {
       colors: this.pinokiod.colors
     });
 
@@ -252,11 +264,13 @@ class AppController {
     BrowserService.attach(mainWindow.webContents);
 
     // Setup window event handlers
+    // CRITICAL: Webview inside the shell will also need BrowserService attached
     mainWindow.webContents.on('did-attach-webview', (event, webContents) => {
+      console.log('[AppController] Webview attached, applying BrowserService configuration');
       BrowserService.attach(webContents);
     });
 
-    console.log('[AppController] Main window created');
+    console.log('[AppController] Command Center shell loaded');
   }
 
   /**

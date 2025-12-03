@@ -115,6 +115,16 @@ window.electronAPI = {
   kernelPatcher: {
     stats: () => ipcRenderer.invoke('kernel-patcher:stats'),
   },
+
+  // Command Center APIs (BMAD Architecture - Epic 6: The Command Center)
+  onCommandCenter: (channel, callback) => {
+    const validChannels = ['attach-terminal'];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.on(`command-center:${channel}`, (event, data) => callback(data));
+    } else {
+      console.error(`[preload] Invalid command-center channel: ${channel}`);
+    }
+  },
 }
 
 ;(function initInspector() {
