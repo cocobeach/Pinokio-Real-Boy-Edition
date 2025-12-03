@@ -125,6 +125,26 @@ window.electronAPI = {
       console.error(`[preload] Invalid command-center channel: ${channel}`);
     }
   },
+
+  // Git APIs (BMAD Architecture - Epic 7: The Agentic IDE)
+  git: {
+    isRepo: (params) => ipcRenderer.invoke('git:is-repo', params),
+    status: (params) => ipcRenderer.invoke('git:status', params),
+    diff: (params) => ipcRenderer.invoke('git:diff', params),
+    stage: (params) => ipcRenderer.invoke('git:stage', params),
+    commit: (params) => ipcRenderer.invoke('git:commit', params),
+    aiCommitMessage: (params) => ipcRenderer.invoke('git:ai-commit-message', params),
+    log: (params) => ipcRenderer.invoke('git:log', params),
+    push: (params) => ipcRenderer.invoke('git:push', params),
+  },
+
+  // Filesystem APIs (BMAD Architecture - Epic 7: The Agentic IDE)
+  filesystem: {
+    readDirectory: (params) => ipcRenderer.invoke('fs:read-directory', params),
+    readFile: (params) => ipcRenderer.invoke('file:read', params),
+    saveFile: (params) => ipcRenderer.invoke('file:save', params),
+    getMetadata: (params) => ipcRenderer.invoke('file:metadata', params),
+  },
 }
 
 ;(function initInspector() {

@@ -16,6 +16,8 @@ const AssetManager = require('../services/AssetManager');
 const InspectorService = require('../services/InspectorService');
 const ForgeService = require('../services/ForgeService');
 const KernelPatcher = require('../services/KernelPatcher'); // Phase 5: The Deep Hook
+const GitService = require('../services/GitService'); // Epic 7: Agentic IDE - Git
+const FileSystemService = require('../services/FileSystemService'); // Epic 7: Agentic IDE - Filesystem
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -315,6 +317,12 @@ class AppController {
     IpcRouter.handle('kernel-patcher:stats', async () => {
       return KernelPatcher.getStats();
     });
+
+    // Git Service handlers (Epic 7: The Agentic IDE)
+    GitService.setupIpcHandlers(IpcRouter);
+
+    // FileSystem Service handlers (Epic 7: The Agentic IDE)
+    FileSystemService.setupIpcHandlers(IpcRouter);
 
     // Custom prompt handler (from original full.js)
     IpcRouter.on('prompt', (eventRet, arg) => {
