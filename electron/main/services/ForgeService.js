@@ -570,6 +570,145 @@ Provide detailed ROOT CAUSE ANALYSIS in JSON format:`;
   }
 
   /**
+   * AI Tutor Mode - Interactive debugging with teaching focus
+   * Epic 9: Story 9.5 - The Structured Tutor
+   * @param {Object} params - Tutor parameters
+   * @param {string} params.errorLog - Error log to analyze
+   * @param {Object} params.context - Additional context (code, manifest, etc.)
+   * @param {string} params.userLevel - User expertise level (beginner, intermediate, advanced)
+   * @returns {Promise<Object>} Interactive tutor response
+   */
+  async tutorDebug(params) {
+    const { errorLog, context = {}, userLevel = 'intermediate' } = params;
+    const fs = require('fs');
+    const path = require('path');
+
+    try {
+      // Load DebugGuide.txt as the "textbook"
+      let debugGuide = '';
+      const debugGuidePath = path.join(__dirname, '..', '..', 'resources', 'DebugGuide.txt');
+
+      if (fs.existsSync(debugGuidePath)) {
+        debugGuide = fs.readFileSync(debugGuidePath, 'utf8');
+        console.log('[ForgeService] AI Tutor Mode activated with DebugGuide');
+      }
+
+      // Build tutor-specific prompt with teaching persona
+      const tutorPrompt = `You are an experienced software engineering tutor helping a ${userLevel} developer debug an issue. Your goal is to TEACH, not just fix.
+
+=== YOUR TEACHING METHODOLOGY ===
+1. **Start with Questions**: Ask the user what they think is happening
+2. **Guide Discovery**: Lead them to discover the root cause themselves
+3. **Explain Concepts**: Teach the underlying principles, not just the fix
+4. **Build Understanding**: Use analogies and examples they can relate to
+5. **Empower Learning**: Give them mental models to solve similar problems
+
+=== TEXTBOOK (Debug Guide) ===
+${debugGuide}
+
+=== THE ERROR THEY'RE FACING ===
+${errorLog}
+
+${context.code ? `=== RELEVANT CODE ===\n${context.code}\n` : ''}
+${context.manifest ? `=== INSTALLATION MANIFEST ===\n${JSON.stringify(context.manifest, null, 2)}\n` : ''}
+
+=== YOUR TUTORING TASK ===
+Using the 5 Whys technique from the Debug Guide, create an interactive lesson that:
+
+1. **Diagnose Together**: Walk them through identifying the error type (Logic/Runtime/Configuration/Integration)
+2. **Ask Socratic Questions**: For each "Why", pose questions that help them think through it
+3. **Teach Solution Patterns**: Reference the patterns in section 3 of the Debug Guide
+4. **Explain the Fix**: Show the solution AND explain why it works
+5. **Build Prevention Skills**: Teach them how to avoid this error class in the future
+
+Output Format (Interactive Lesson):
+{
+  "lessonTitle": "string (catchy title for this debugging lesson)",
+  "errorType": "string (Logic/Runtime/Configuration/Integration)",
+  "tutorIntro": "string (friendly intro, acknowledge the frustration)",
+  "guidedDiagnosis": [
+    {
+      "step": 1,
+      "question": "string (Socratic question to ask)",
+      "hint": "string (hint if they're stuck)",
+      "answer": "string (the insight they should reach)"
+    }
+  ],
+  "rootCauseExplanation": {
+    "symptom": "string (what they see)",
+    "cause": "string (what's really happening)",
+    "analogy": "string (real-world analogy to explain it)",
+    "technicalDetails": "string (the technical deep-dive)"
+  },
+  "solutionPattern": "string (pattern name from Debug Guide)",
+  "theFix": {
+    "code": "string (the corrected code)",
+    "explanation": "string (why this fixes it)",
+    "tradeoffs": "string (any limitations or alternatives)"
+  },
+  "preventionLesson": {
+    "principle": "string (the general principle to remember)",
+    "checklist": ["string (preventive checks they can use)"],
+    "mentalModel": "string (mental model for future debugging)"
+  },
+  "nextSteps": ["string (recommended actions)"],
+  "furtherReading": ["string (resources to learn more)"]
+}
+
+Provide a supportive, encouraging debugging lesson in JSON format:`;
+
+      // Use AIController in 'debugging' mode with tutor context
+      console.log('[ForgeService] Tutor is analyzing the problem...');
+
+      const tutorResponse = await AIController.agenticCode(
+        tutorPrompt,
+        'debugging',  // Use debugging mode (Ollama first)
+        {
+          useGAN: false,  // Single-pass for interactive tutoring
+          context: {
+            userLevel,
+            error: errorLog.substring(0, 1000)
+          }
+        }
+      );
+
+      if (!tutorResponse.success) {
+        throw new Error(`AI Tutor failed: ${tutorResponse.error}`);
+      }
+
+      // Parse JSON response
+      let jsonStr = tutorResponse.response;
+      const jsonMatch = tutorResponse.response.match(/```json\s*([\s\S]*?)\s*```/) ||
+                       tutorResponse.response.match(/\{[\s\S]*\}/);
+
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1] || jsonMatch[0];
+      }
+
+      const lesson = JSON.parse(jsonStr);
+
+      console.log('[ForgeService] Tutor lesson prepared:', lesson.lessonTitle);
+
+      return {
+        success: true,
+        mode: 'tutor',
+        userLevel,
+        lesson,
+        provider: tutorResponse.provider,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      console.error('[ForgeService] AI Tutor failed:', error);
+      return {
+        success: false,
+        error: error.message,
+        fallbackMessage: 'Tutor mode unavailable - falling back to standard error analysis'
+      };
+    }
+  }
+
+  /**
    * Setup IPC handlers
    * @param {IpcRouter} ipcRouter - IPC router instance
    */
@@ -605,6 +744,15 @@ Provide detailed ROOT CAUSE ANALYSIS in JSON format:`;
         errorLog: params.errorLog,
         originalManifest: manifest,
         model: params.model
+      });
+    });
+
+    // AI Tutor debug (Epic 9: Story 9.5)
+    ipcRouter.handle('forge:tutor-debug', async (event, params) => {
+      return await this.tutorDebug({
+        errorLog: params.errorLog,
+        context: params.context || {},
+        userLevel: params.userLevel || 'intermediate'
       });
     });
 

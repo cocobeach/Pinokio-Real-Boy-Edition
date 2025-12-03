@@ -137,6 +137,7 @@ window.electronAPI = {
   forge: {
     create: (params) => ipcRenderer.invoke('forge:create', params),
     analyzeError: (params) => ipcRenderer.invoke('forge:analyze-error', params),
+    tutorDebug: (params) => ipcRenderer.invoke('forge:tutor-debug', params), // Epic 9: Story 9.5
     history: (params) => ipcRenderer.invoke('forge:history', params),
     active: () => ipcRenderer.invoke('forge:active'),
     executeInTerminal: (params) => ipcRenderer.invoke('forge:execute-in-terminal', params),
