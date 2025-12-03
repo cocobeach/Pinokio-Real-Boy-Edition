@@ -4,7 +4,7 @@
 
 This document describes the BMAD (Browser, Modular, AI, Data) architecture refactoring of Pinokio from a monolithic "fire-and-forget" script runner to a robust Local AI Operating System.
 
-**Status:** ✅ Phase 4 Complete - GAS Integration & Forge Pipeline
+**Status:** ✅ Phase 5 Complete - The Deep Hook (Kernel-Level Integration)
 
 **Date:** December 2, 2025
 
@@ -13,6 +13,7 @@ This document describes the BMAD (Browser, Modular, AI, Data) architecture refac
 - ✅ Phase 2: The Senses (Living Interface & UI Components)
 - ✅ Phase 3: The Brain (AI Architect & Forge)
 - ✅ Phase 4: The Smart Volume (GAS Integration & Automation)
+- ✅ Phase 5: The Soul (Deep Integration - Autonomous Deduplication)
 
 ---
 
@@ -460,15 +461,92 @@ PINOKIO_BROWSER_LOG=1 npm start
   - Forge: `executeInTerminal`, `saveManifest`, `onExecutionProgress`
   - File: `preload.js`
 
-### ⏳ Pending (Phase 5 - Polish & Deep Integration)
+### ✅ Completed (Phase 5) - December 2, 2025
 
-- [ ] Deep pinokiod integration (intercept fs.download to use GAS automatically)
+- [x] **KernelPatcher Service** - The Deep Hook (Runtime Monkey-Patching)
+  - **Core Innovation**: Intercepts pinokiod's internal `kernel.api.fs.download` at runtime
+  - **Zero Code Changes**: Legacy scripts from 2+ years ago automatically use GAS
+  - **Graceful Degradation**: Falls back to original download on any error
+  - **File**: `electron/main/services/KernelPatcher.js`
+
+**Key Features**:
+- **Kernel Structure Validation**: Verifies API exists before patching
+- **Safe Interception**: Saves original method, wraps with GAS logic
+- **Progress Relay**: Maintains UI progress indicators
+- **Comprehensive Logging**: Tracks hits, misses, fallbacks
+- **Statistics**: Real-time monitoring of GAS effectiveness
+
+**The Interceptor Logic**:
+```javascript
+1. Script calls: fs.download({ url, path })
+2. KernelPatcher intercepts BEFORE disk write
+3. Check GAS: AssetManager.getDownloadPlan(url, path)
+   - If HIT (exists in GAS): Create symlink, skip download entirely
+   - If MISS (not in GAS): Download to GAS, then symlink to target
+4. Original fs.download NEVER called for model files
+5. Result: Automatic deduplication for ALL scripts
+```
+
+**Robustness Features**:
+- **API Validation**: Checks `kernel.api.fs.download` exists
+- **Error Containment**: Try/catch at every level
+- **Automatic Fallback**: On ANY error, calls original download
+- **No Silent Failures**: Comprehensive console logging
+- **Stat Tracking**: Intercepted downloads, GAS hits, GAS misses, fallbacks
+
+**Integration Points**:
+- **AppController.applyKernelPatch()**: Initializes and patches after pinokiod starts
+- **AppController.shutdown()**: Logs session stats before cleanup
+- **IPC Handler**: `kernel-patcher:stats` for UI monitoring
+- **File**: `electron/main/controllers/AppController.js`
+
+**Progress Relay System**:
+- Intercepts `ondata` callbacks from original download
+- Emits GAS-specific messages: "[GAS] Model found in Global Asset Store!"
+- Maintains progress bars for downloads to GAS
+- User sees: "Downloading to GAS for future reuse..."
+
+**Example Session Output**:
+```
+[KernelPatcher] 🎯 Intercepted download: https://huggingface.co/model.safetensors
+[KernelPatcher] GAS Plan: link (exists_in_gas)
+[KernelPatcher] ⚡ GAS HIT! Linking from GAS instead of downloading.
+[KernelPatcher] ✅ Link created (symlink). Saved bandwidth!
+
+Session Stats:
+{
+  "interceptedDownloads": 15,
+  "gasHits": 12,
+  "gasMisses": 3,
+  "fallbackCount": 0,
+  "hitRate": "80%",
+  "bandwidthSaved": "12 downloads skipped via GAS"
+}
+```
+
+**Testing Scenarios Handled**:
+1. ✅ Normal download → Downloads to GAS, links to target
+2. ✅ File exists in GAS → Instant symlink, no download
+3. ✅ File exists at target → Skip entirely
+4. ✅ Kernel API missing → Graceful degradation, logs warning
+5. ✅ Download to GAS fails → Falls back to original download
+6. ✅ Symlink fails (Windows) → Falls back to copy
+7. ✅ Any exception → Falls back to original, no script breakage
+
+**Preload API**:
+```javascript
+window.electronAPI.kernelPatcher.stats()  // Get real-time stats
+```
+
+### ⏳ Future Enhancements (Phase 6)
+
 - [ ] File system IPC for Editor (save/load via main process)
 - [ ] Terminal session persistence across app restarts
 - [ ] Monaco editor file tree integration
 - [ ] Model recommendation engine
 - [ ] GAS statistics dashboard UI
 - [ ] Forge wizard integration with Terminal component
+- [ ] Intelligent cache warming (pre-download popular models)
 
 ### 📝 Not Migrated (Preserved in full.js for now)
 
@@ -651,16 +729,18 @@ For architecture questions, see:
 - **Phase 2**: Static → Living (Terminal, Editor, Inspector UI)
 - **Phase 3**: Dumb → Smart (AI Forge generates installation scripts)
 - **Phase 4**: Wasteful → Efficient (GAS deduplication, smart downloads, automation)
+- **Phase 5**: Manual → Autonomous (Kernel-level interception, zero-config deduplication)
 
 ---
 
-**Status: Phase 4 Complete - Production Ready** 🚀
+**Status: Phase 5 Complete - Fully Autonomous** 🚀
 
 **The Transformation is Complete:**
 - Phase 1: The Body (Core Services) ✅
 - Phase 2: The Senses (Living Interface) ✅
 - Phase 3: The Brain (AI Architect) ✅
 - Phase 4: The Smart Volume (GAS Integration) ✅
-- Phase 5: The Soul (Deep Integration) ⏳ (Future enhancements)
+- Phase 5: The Soul (Deep Hook - Autonomous Deduplication) ✅
+- Phase 6: The Future (Polish & Enhancements) ⏳
 
-**Pinokio has evolved from a simple puppet into a Real Boy.** 🤖 → 🦸
+**Pinokio is now fully autonomous - from puppet to Real Boy to Technomancer.** 🤖 → 🦸 → 🧙

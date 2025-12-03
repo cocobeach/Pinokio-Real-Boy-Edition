@@ -110,6 +110,11 @@ window.electronAPI = {
     onProgress: (callback) => ipcRenderer.on('forge:progress', (event, data) => callback(data)),
     onExecutionProgress: (callback) => ipcRenderer.on('forge:execution-progress', (event, data) => callback(data)),
   },
+
+  // Kernel Patcher APIs (BMAD Architecture - Phase 5: The Deep Hook)
+  kernelPatcher: {
+    stats: () => ipcRenderer.invoke('kernel-patcher:stats'),
+  },
 }
 
 ;(function initInspector() {

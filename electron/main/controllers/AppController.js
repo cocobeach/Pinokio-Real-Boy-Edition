@@ -15,6 +15,7 @@ const BrowserService = require('../services/BrowserService');
 const AssetManager = require('../services/AssetManager');
 const InspectorService = require('../services/InspectorService');
 const ForgeService = require('../services/ForgeService');
+const KernelPatcher = require('../services/KernelPatcher'); // Phase 5: The Deep Hook
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -49,6 +50,9 @@ class AppController {
 
       // Start Pinokiod server
       await this.startPinokiod();
+
+      // Phase 5: Apply Deep Hook to intercept all downloads
+      await this.applyKernelPatch();
 
       // Show splash screen
       WindowManager.createSplashWindow();
@@ -133,6 +137,64 @@ class AppController {
   }
 
   /**
+   * Apply kernel patch for GAS Deep Hook
+   * Intercepts all fs.download calls to use Global Asset Store
+   * Phase 5: The Deep Hook
+   */
+  async applyKernelPatch() {
+    console.log('[AppController] Applying Phase 5: The Deep Hook...');
+
+    try {
+      // Initialize KernelPatcher with pinokiod reference
+      const initResult = KernelPatcher.initialize(this.pinokiod);
+
+      if (!initResult.success) {
+        console.warn('[AppController] KernelPatcher initialization failed:', initResult.reason);
+        console.warn('[AppController] Graceful degradation: Downloads will NOT use GAS automatically');
+        console.warn('[AppController] Errors:', initResult.errors);
+        return {
+          success: false,
+          graceful: true,
+          reason: initResult.reason
+        };
+      }
+
+      console.log('[AppController] KernelPatcher initialized successfully');
+
+      // Apply the patch
+      const patchResult = KernelPatcher.patch();
+
+      if (!patchResult.success) {
+        console.error('[AppController] Failed to apply Deep Hook:', patchResult.error);
+        console.warn('[AppController] Graceful degradation: Downloads will use legacy behavior');
+        return {
+          success: false,
+          graceful: true,
+          error: patchResult.error
+        };
+      }
+
+      console.log('[AppController] ✅ Deep Hook ACTIVE');
+      console.log('[AppController] All fs.download calls will automatically use GAS');
+      console.log('[AppController] Legacy scripts from 2 years ago will now benefit from deduplication');
+
+      return {
+        success: true,
+        patched: true
+      };
+
+    } catch (error) {
+      console.error('[AppController] CRITICAL: Kernel patch threw exception:', error);
+      console.error('[AppController] Continuing with legacy download behavior');
+      return {
+        success: false,
+        graceful: true,
+        error: error.message
+      };
+    }
+  }
+
+  /**
    * Create main application window
    */
   async createMainWindow() {
@@ -188,6 +250,11 @@ class AppController {
 
     // Forge handlers (AI-powered installation generation)
     ForgeService.setupIpcHandlers(IpcRouter);
+
+    // KernelPatcher stats handler (Phase 5: The Deep Hook)
+    IpcRouter.handle('kernel-patcher:stats', async () => {
+      return KernelPatcher.getStats();
+    });
 
     // Custom prompt handler (from original full.js)
     IpcRouter.on('prompt', (eventRet, arg) => {
@@ -245,6 +312,7 @@ class AppController {
       ForgeService.destroy();
       InspectorService.destroy();
       await AIController.destroy();
+      KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();
       BrowserService.destroy();
@@ -275,7 +343,8 @@ class AppController {
         pinokiod: !!this.pinokiod,
         window: !!WindowManager.getMainWindow(),
         ai: AIController.getStatus(),
-        update: UpdateService.getStatus()
+        update: UpdateService.getStatus(),
+        kernelPatcher: KernelPatcher.getStats() // Phase 5 stats
       }
     };
   }
