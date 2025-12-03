@@ -1,0 +1,395 @@
+================================================================================
+                    PINOKIO DEBUG GUIDE
+          Structured Debugging Methodology for AI Analysis
+================================================================================
+
+Epic 8: The Awakened Mind - Root Cause Analysis Framework
+This guide provides a systematic approach to debugging errors in AI-generated
+installation scripts. Use this when analyzing failures in ForgeService.
+
+================================================================================
+1. ERROR CLASSIFICATION TAXONOMY
+================================================================================
+
+Before diving into analysis, classify the error type:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ ERROR TYPE       │ CHARACTERISTICS            │ TYPICAL CAUSES      │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ LOGIC ERROR      │ - Script runs but wrong    │ - Incorrect paths   │
+│                  │   behavior                 │ - Wrong assumptions │
+│                  │ - Silent failures          │ - Logic flaws       │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ RUNTIME ERROR    │ - Crashes during execution │ - Missing deps      │
+│                  │ - Exit code != 0           │ - Permission issues │
+│                  │ - Exception/stack trace    │ - Resource limits   │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ CONFIGURATION    │ - Environment mismatch     │ - Wrong env vars    │
+│ ERROR            │ - Path not found           │ - Missing config    │
+│                  │ - Version incompatibility  │ - Hardcoded paths   │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ INTEGRATION      │ - Works in isolation but   │ - Race conditions   │
+│ ERROR            │   fails in system          │ - Port conflicts    │
+│                  │ - Timing issues            │ - State pollution   │
+└──────────────────┴────────────────────────────┴─────────────────────┘
+
+================================================================================
+2. THE 5 WHYS TECHNIQUE
+================================================================================
+
+For each error, ask "Why?" five times to drill down to root cause:
+
+TEMPLATE:
+---------
+Problem: [Observable symptom]
+│
+├─ Why #1: [Immediate cause]
+│  ├─ Evidence: [Log/output that shows this]
+│  └─ Next question: Why did this immediate cause occur?
+│
+├─ Why #2: [Underlying cause]
+│  ├─ Evidence: [Context that reveals this]
+│  └─ Next question: Why did this underlying cause occur?
+│
+├─ Why #3: [Systemic cause]
+│  ├─ Evidence: [Pattern or design issue]
+│  └─ Next question: Why does this pattern exist?
+│
+├─ Why #4: [Process cause]
+│  ├─ Evidence: [Workflow or architecture issue]
+│  └─ Next question: Why wasn't this caught earlier?
+│
+└─ Why #5: ROOT CAUSE
+   ├─ Core issue: [The fixable root problem]
+   └─ Prevention: [How to avoid this class of errors]
+
+EXAMPLE 1: Python Module Import Error
+--------------------------------------
+Problem: Script crashes with "ModuleNotFoundError: No module named 'torch'"
+
+├─ Why #1: The torch module is not installed in the environment
+│  └─ Evidence: pip list | grep torch returns empty
+│
+├─ Why #2: The installation command didn't include torch
+│  └─ Evidence: No "pip install torch" in installCommands array
+│
+├─ Why #3: AI didn't detect torch requirement from requirements.txt
+│  └─ Evidence: requirements.txt exists but wasn't parsed
+│
+├─ Why #4: AI prompt didn't instruct to read requirements.txt
+│  └─ Evidence: Manifest generation prompt lacks "parse dependencies" step
+│
+└─ Why #5: ROOT CAUSE
+   └─ ForgeService prompt is too generic, doesn't enforce dependency analysis
+   └─ FIX: Add explicit step to AIController prompt:
+       "1. Clone repo, 2. Read requirements.txt/package.json,
+        3. Generate install commands from dependencies"
+
+EXAMPLE 2: Permission Denied Error
+-----------------------------------
+Problem: Git clone fails with "Permission denied (publickey)"
+
+├─ Why #1: SSH authentication failed
+│  └─ Evidence: Error mentions publickey, not password
+│
+├─ Why #2: No SSH key configured for this repo
+│  └─ Evidence: ~/.ssh/id_rsa doesn't exist or not in ssh-agent
+│
+├─ Why #3: AI used SSH URL instead of HTTPS URL
+│  └─ Evidence: sourceUrl is "git@github.com:..." not "https://..."
+│
+├─ Why #4: AI didn't validate URL accessibility
+│  └─ Evidence: No validation step in manifest generation
+│
+└─ Why #5: ROOT CAUSE
+   └─ Always prefer HTTPS URLs for public repos (no auth needed)
+   └─ FIX: Add URL normalization to InstallManifest:
+       - Convert git@github.com:user/repo.git → https://github.com/user/repo.git
+       - Validate URL is accessible before returning manifest
+
+EXAMPLE 3: CUDA Out of Memory
+------------------------------
+Problem: Model training crashes with "CUDA out of memory"
+
+├─ Why #1: Model is too large for GPU VRAM
+│  └─ Evidence: nvidia-smi shows 16GB VRAM, model requires 24GB
+│
+├─ Why #2: Batch size is too large
+│  └─ Evidence: batch_size=32 in config, reducing to 8 works
+│
+├─ Why #3: AI didn't detect GPU constraints
+│  └─ Evidence: No HardwareService check before run command
+│
+├─ Why #4: No hardware profiling in manifest generation
+│  └─ Evidence: AI doesn't know user has dual RTX A4000 (16GB each)
+│
+└─ Why #5: ROOT CAUSE
+   └─ Need HardwareService integration with ForgeService
+   └─ FIX: Before generating runCommand, call HardwareService.getGPUInfo()
+       - If VRAM < 24GB, suggest batch_size=8 or --low-vram flag
+       - Add env vars: PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+
+================================================================================
+3. SOLUTION PATTERNS
+================================================================================
+
+Common fixes by error category:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ PATTERN          │ WHEN TO USE                │ IMPLEMENTATION      │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ TRY-CATCH        │ - Flaky network operations │ Wrap git clone,     │
+│ INJECTION        │ - External dependencies    │ fs.download with    │
+│                  │ - Resource constraints     │ retry logic (3x)    │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ RETRY LOGIC      │ - Transient failures       │ for i in 1 2 3; do  │
+│                  │ - Network timeouts         │   cmd && break ||   │
+│                  │ - Race conditions          │   sleep 5; done     │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ STATE CLEANUP    │ - Partial installations    │ rm -rf dir before   │
+│                  │ - Dirty git state          │ git clone; git      │
+│                  │ - Lock files               │ reset --hard HEAD   │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ INPUT            │ - User-provided URLs       │ Validate URL format │
+│ VALIDATION       │ - File paths               │ Check path exists   │
+│                  │ - Configuration values     │ before using it     │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ GRACEFUL         │ - Optional features        │ command -v nvidia-  │
+│ DEGRADATION      │ - Platform differences     │ smi || echo "No GPU"│
+│                  │ - Missing tools            │ Use CPU fallback    │
+├──────────────────┼────────────────────────────┼─────────────────────┤
+│ DEPENDENCY       │ - Complex setup            │ Check dependencies  │
+│ ORDERING         │ - Multi-step installs      │ exist before use:   │
+│                  │ - Conditional paths        │ test -f file || fail│
+└──────────────────┴────────────────────────────┴─────────────────────┘
+
+================================================================================
+4. DIVIDE & CONQUER METHODOLOGY
+================================================================================
+
+When facing a complex error, break it down:
+
+STEP 1: ISOLATE THE FAILURE POINT
+   - Which command in the sequence failed?
+   - Can earlier commands be reproduced successfully?
+   - Does the error occur consistently or intermittently?
+
+STEP 2: EXTRACT MINIMAL REPRODUCTION
+   - Run the failing command in isolation
+   - Remove unrelated parameters
+   - Test in clean environment (empty directory)
+
+STEP 3: BINARY SEARCH THROUGH CHANGES
+   - If it worked before, what changed?
+   - Test midpoint between working and broken state
+   - Narrow down to specific line/parameter
+
+STEP 4: VALIDATE ASSUMPTIONS
+   - List all assumptions made in the script
+   - Test each assumption explicitly
+   - Document which assumptions are violated
+
+STEP 5: TEST THE FIX
+   - Apply proposed solution in isolation
+   - Verify fix doesn't break other functionality
+   - Run full installation script end-to-end
+
+================================================================================
+5. ROOT CAUSE ANALYSIS FRAMEWORK
+================================================================================
+
+Use this checklist to ensure thorough analysis:
+
+□ SYMPTOM DOCUMENTATION
+  □ Exact error message (copy-paste, no paraphrasing)
+  □ Exit code or status code
+  □ Timestamp and system state when error occurred
+  □ Relevant log snippets (before and after error)
+
+□ CONTEXT GATHERING
+  □ What was the intended behavior?
+  □ What commands led to this state?
+  □ What environment variables are set?
+  □ What is the current working directory?
+
+□ HYPOTHESIS GENERATION
+  □ List 3-5 possible causes
+  □ Rank by likelihood based on evidence
+  □ Identify what evidence would confirm/refute each
+
+□ HYPOTHESIS TESTING
+  □ Test most likely hypothesis first
+  □ Change only ONE variable at a time
+  □ Document results of each test
+
+□ SOLUTION VALIDATION
+  □ Does the fix address root cause (not just symptom)?
+  □ Can the fix be generalized to similar cases?
+  □ Does the fix introduce new risks?
+
+□ PREVENTION PLANNING
+  □ How can this error be detected earlier?
+  □ What guard rails can prevent recurrence?
+  □ Should this trigger a prompt improvement?
+
+================================================================================
+6. PREVENTION STRATEGIES
+================================================================================
+
+After fixing an error, implement these safeguards:
+
+1. ADD VALIDATION
+   - Validate inputs before using them
+   - Check preconditions before operations
+   - Verify postconditions after critical steps
+
+2. IMPROVE ERROR MESSAGES
+   - Include context (what was being attempted)
+   - Suggest corrective actions
+   - Link to documentation
+
+3. ADD LOGGING
+   - Log key decision points
+   - Log external command outputs
+   - Log state transitions
+
+4. ENHANCE PROMPTS
+   - If AI made incorrect assumption, clarify in prompt
+   - Add examples of edge cases
+   - Specify validation requirements
+
+5. UPDATE DOCUMENTATION
+   - Document discovered constraints
+   - Add troubleshooting section for common errors
+   - Create runbook for recovery procedures
+
+6. IMPLEMENT TESTS
+   - Add test case that reproduces the error
+   - Verify fix prevents regression
+   - Test error handling paths
+
+================================================================================
+7. AI-SPECIFIC DEBUGGING NOTES
+================================================================================
+
+When debugging AI-generated scripts:
+
+COMMON AI PITFALLS:
+- **Path Hallucination**: AI invents paths that don't exist
+  → Always validate paths before use
+
+- **Optimistic Assumptions**: AI assumes ideal conditions
+  → Add error handling for failure modes
+
+- **Copy-Paste from Web**: AI replicates tutorial code without adaptation
+  → Verify commands work in Pinokio environment
+
+- **Version Blindness**: AI uses outdated syntax/commands
+  → Specify required versions explicitly
+
+- **Context Window Amnesia**: AI forgets earlier decisions
+  → Include full context in debugging prompt
+
+- **Overfitting to Examples**: AI rigidly follows patterns
+  → Encourage reasoning about specific case
+
+GAN REFINEMENT TARGETS:
+When running GAN loops, critique for:
+1. **Robustness**: Does it handle edge cases?
+2. **Idempotency**: Can it be run multiple times safely?
+3. **Clarity**: Are error messages actionable?
+4. **Efficiency**: Are there redundant operations?
+5. **Security**: Are there injection risks?
+
+================================================================================
+8. DEBUGGING WORKFLOW
+================================================================================
+
+For ForgeService integration:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  1. Error Detected                                                  │
+│     └─> Extract: command, exit_code, stderr, stdout                │
+│                                                                     │
+│  2. Load This Guide                                                 │
+│     └─> fs.readFileSync('resources/DebugGuide.txt')                │
+│                                                                     │
+│  3. AI Prompt Construction                                          │
+│     └─> Include: error details, this guide, manifest context       │
+│                                                                     │
+│  4. Request Root Cause Analysis                                     │
+│     └─> "Using the 5 Whys, analyze: [error]"                       │
+│                                                                     │
+│  5. Generate Fix                                                    │
+│     └─> "Propose solution following patterns in section 3"         │
+│                                                                     │
+│  6. Validate Fix (GAN Loop)                                         │
+│     └─> Second AI model critiques proposed fix                     │
+│                                                                     │
+│  7. Apply Fix                                                       │
+│     └─> Update InstallManifest with corrected commands             │
+│                                                                     │
+│  8. Retry Installation                                              │
+│     └─> Execute updated script, monitor for success                │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+9. EXAMPLE DEBUGGING SESSION
+================================================================================
+
+USER: Install https://github.com/comfyanonymous/ComfyUI
+
+AI ARCHITECT: Generates manifest with:
+  - git clone https://github.com/comfyanonymous/ComfyUI
+  - pip install torch torchvision torchaudio
+  - pip install -r requirements.txt
+  - python main.py
+
+EXECUTION: Fails with "ModuleNotFoundError: No module named 'xformers'"
+
+DEBUGGER (using this guide):
+
+  Classification: RUNTIME ERROR (missing dependency)
+
+  5 Whys:
+  1. Why? xformers not installed
+  2. Why? Not in requirements.txt (it's optional)
+  3. Why? AI didn't detect xformers import in code
+  4. Why? Didn't scan source for imports beyond requirements.txt
+  5. ROOT CAUSE: Need to scan main.py for imports
+
+  Solution Pattern: DEPENDENCY VALIDATION
+  - Scan source files for imports
+  - Cross-reference with installed packages
+  - Add missing packages to installCommands
+
+  Fix Applied:
+    installCommands: [
+      "pip install torch torchvision torchaudio",
+      "pip install -r requirements.txt",
+      "pip install xformers"  // <-- ADDED
+    ]
+
+  GAN Critique:
+  - xformers is CUDA-specific, add fallback
+  - Check GPU availability before installing
+
+  Final Fix:
+    installCommands: [
+      "pip install torch torchvision torchaudio",
+      "pip install -r requirements.txt",
+      "command -v nvidia-smi && pip install xformers || echo 'Skipping xformers (no GPU)'"
+    ]
+
+  Result: Installation succeeds, gracefully degrades on CPU-only systems
+
+================================================================================
+END OF DEBUG GUIDE
+================================================================================
+
+This guide is a living document. As new error patterns emerge, update this
+file with additional examples and solution patterns.
+
+For questions or suggestions, see: docs/Epic8-TheAwakenedMind.md

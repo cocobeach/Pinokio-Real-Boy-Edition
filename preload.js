@@ -80,13 +80,47 @@ window.electronAPI = {
     onExit: (callback) => ipcRenderer.on('terminal:exit', (event, data) => callback(data)),
   },
 
-  // AI APIs (BMAD Architecture)
+  // AI APIs (BMAD Architecture - Enhanced for Epic 8)
   ai: {
+    // Legacy APIs (backward compatibility)
     initialize: (options) => ipcRenderer.invoke('ai:initialize', options),
     start: () => ipcRenderer.invoke('ai:start'),
     stop: () => ipcRenderer.invoke('ai:stop'),
     ask: (params) => ipcRenderer.invoke('ai:ask', params),
     status: () => ipcRenderer.invoke('ai:status'),
+
+    // Epic 8: The Awakened Mind - Multi-provider AI
+    query: (params) => ipcRenderer.invoke('ai:query', params),
+    agenticCode: (params) => ipcRenderer.invoke('ai:agentic-code', params),
+    ganRefine: (params) => ipcRenderer.invoke('ai:gan-refine', params),
+    updateGANSettings: (settings) => ipcRenderer.invoke('ai:update-gan-settings', settings),
+    updateModePreferences: (params) => ipcRenderer.invoke('ai:update-mode-preferences', params),
+    getProviders: () => ipcRenderer.invoke('ai:get-providers'),
+  },
+
+  // Hardware APIs (Epic 8: The Awakened Mind)
+  hardware: {
+    getGPU: (params) => ipcRenderer.invoke('hardware:gpu', params),
+    getCPU: () => ipcRenderer.invoke('hardware:cpu'),
+    getSystem: () => ipcRenderer.invoke('hardware:system'),
+    checkCompatibility: (params) => ipcRenderer.invoke('hardware:check-compatibility', params),
+    getSummary: () => ipcRenderer.invoke('hardware:summary'),
+  },
+
+  // Config APIs (Epic 8: Configuration Management)
+  config: {
+    getProviderPreferences: () => ipcRenderer.invoke('config:get-provider-preferences'),
+    setProviderPreferences: (prefs) => ipcRenderer.invoke('config:set-provider-preferences', prefs),
+    getModePreferences: () => ipcRenderer.invoke('config:get-mode-preferences'),
+    setModePreferences: (prefs) => ipcRenderer.invoke('config:set-mode-preferences', prefs),
+    getGANSettings: () => ipcRenderer.invoke('config:get-gan-settings'),
+    setGANSettings: (settings) => ipcRenderer.invoke('config:set-gan-settings', settings),
+    getQuotaSettings: () => ipcRenderer.invoke('config:get-quota-settings'),
+    setQuotaSettings: (settings) => ipcRenderer.invoke('config:set-quota-settings', settings),
+    getHardwareSettings: () => ipcRenderer.invoke('config:get-hardware-settings'),
+    setHardwareSettings: (settings) => ipcRenderer.invoke('config:set-hardware-settings', settings),
+    getEpic8Config: () => ipcRenderer.invoke('config:get-epic8-config'),
+    resetEpic8Config: () => ipcRenderer.invoke('config:reset-epic8-config'),
   },
 
   // Global Asset Store APIs (BMAD Architecture)

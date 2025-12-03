@@ -1,27 +1,55 @@
 /**
- * AIController - Self-Managed Intelligence Layer
- * Manages the lifecycle of the local LLM using electron-ollama
- * Provides AI capabilities without external dependencies
+ * AIController - The Awakened Mind
+ * Epic 8: Multi-provider AI orchestration with mode-based routing
+ * Manages Ollama (local), Claude CLI, and Gemini Code Assist CLI
+ * Implements GAN refinement loops for quality improvement
  */
 
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { exec } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(exec);
 
 class AIController {
   constructor() {
+    // Ollama (local AI)
     this.ollama = null;
     this.isRunning = false;
     this.ollamaPath = null;
-    this.port = 11435; // Non-standard port to avoid conflicts
+    this.port = 11435;
     this.initialized = false;
+
+    // Multi-provider configuration
+    this.providers = {
+      ollama: { available: false, type: 'local', quota: Infinity, used: 0 },
+      claude: { available: false, type: 'cli', quota: 200, used: 0, resetInterval: 5 * 60 * 60 * 1000 }, // 200 msgs / 5hrs
+      gemini: { available: false, type: 'cli', quota: 1000, used: 0, resetInterval: 24 * 60 * 60 * 1000 }  // 1000 reqs / day
+    };
+
+    // Mode-based routing configuration
+    this.modePreferences = {
+      planning: ['gemini', 'claude', 'ollama'],    // Gemini best for high-volume planning
+      developing: ['claude', 'gemini', 'ollama'],   // Claude best for precision coding
+      debugging: ['ollama', 'gemini', 'claude']     // Ollama first (free), then paid
+    };
+
+    // GAN refinement settings
+    this.ganSettings = {
+      enabled: true,
+      rounds: 2,  // 2-3 iterations recommended
+      architectModel: 'claude',   // Primary model for generation
+      critiqueModel: 'gemini'     // Secondary model for critique
+    };
+
+    // Quota reset timers
+    this.quotaResetTimers = {};
   }
 
   /**
    * Initialize the AI controller
    * @param {Object} options - Initialization options
-   * @param {string} options.binPath - Custom binary path (default: ~/pinokio/bin)
-   * @param {number} options.port - Custom port (default: 11435)
    */
   async initialize(options = {}) {
     if (this.initialized) {
@@ -30,63 +58,153 @@ class AIController {
     }
 
     try {
-      // Set custom port if provided
+      // Initialize Ollama (backward compatibility)
+      await this.initializeOllama(options);
+
+      // Detect CLI tools
+      await this.detectCLIProviders();
+
+      // Setup quota reset timers
+      this.setupQuotaResetTimers();
+
+      this.initialized = true;
+      console.log('[AIController] Multi-provider initialization complete');
+      console.log('[AIController] Available providers:', this.getAvailableProviders());
+
+      return { success: true, providers: this.providers };
+
+    } catch (error) {
+      console.error('[AIController] Initialization failed:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Initialize Ollama (legacy support)
+   */
+  async initializeOllama(options = {}) {
+    try {
       if (options.port) {
         this.port = options.port;
       }
 
-      // Determine ollama binary path
       const homedir = os.homedir();
       const binPath = options.binPath || path.join(homedir, 'pinokio', 'bin');
       this.ollamaPath = path.join(binPath, os.platform() === 'win32' ? 'ollama.exe' : 'ollama');
 
       console.log(`[AIController] Ollama binary path: ${this.ollamaPath}`);
 
-      // Check if ollama binary exists
       const exists = fs.existsSync(this.ollamaPath);
       if (!exists) {
-        console.warn('[AIController] Ollama binary not found. AI features will be unavailable.');
-        console.warn('[AIController] Expected location:', this.ollamaPath);
+        console.warn('[AIController] Ollama binary not found.');
         return { success: false, reason: 'binary_not_found' };
       }
 
-      // Lazy load electron-ollama only if binary exists
-      try {
-        const { Ollama } = require('electron-ollama');
-        this.ollama = new Ollama();
-        this.initialized = true;
-        console.log('[AIController] Initialized successfully');
-        return { success: true };
-      } catch (error) {
-        console.error('[AIController] Failed to load electron-ollama:', error);
-        return { success: false, reason: 'module_load_error', error: error.message };
-      }
+      const { Ollama } = require('electron-ollama');
+      this.ollama = new Ollama();
+      this.providers.ollama.available = true;
+
+      console.log('[AIController] Ollama initialized');
+      return { success: true };
 
     } catch (error) {
-      console.error('[AIController] Initialization failed:', error);
-      return { success: false, reason: 'initialization_error', error: error.message };
+      console.error('[AIController] Ollama initialization failed:', error);
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * Start the Ollama service
-   * @returns {Promise<Object>} Status of the operation
+   * Detect available CLI providers
+   */
+  async detectCLIProviders() {
+    // Check for Claude Code CLI
+    try {
+      await execAsync('claude-code --version');
+      this.providers.claude.available = true;
+      console.log('[AIController] Claude Code CLI detected');
+    } catch (error) {
+      console.log('[AIController] Claude Code CLI not available');
+    }
+
+    // Check for Gemini Code Assist CLI
+    try {
+      await execAsync('gemini-code --version');
+      this.providers.gemini.available = true;
+      console.log('[AIController] Gemini Code Assist CLI detected');
+    } catch (error) {
+      console.log('[AIController] Gemini Code Assist CLI not available');
+    }
+  }
+
+  /**
+   * Setup quota reset timers
+   */
+  setupQuotaResetTimers() {
+    // Reset Claude quota every 5 hours
+    if (this.providers.claude.available) {
+      this.quotaResetTimers.claude = setInterval(() => {
+        this.providers.claude.used = 0;
+        console.log('[AIController] Claude quota reset');
+      }, this.providers.claude.resetInterval);
+    }
+
+    // Reset Gemini quota every 24 hours
+    if (this.providers.gemini.available) {
+      this.quotaResetTimers.gemini = setInterval(() => {
+        this.providers.gemini.used = 0;
+        console.log('[AIController] Gemini quota reset');
+      }, this.providers.gemini.resetInterval);
+    }
+  }
+
+  /**
+   * Get list of available providers
+   */
+  getAvailableProviders() {
+    return Object.keys(this.providers).filter(p => this.providers[p].available);
+  }
+
+  /**
+   * Select best provider based on mode and quota
+   * @param {string} mode - 'planning', 'developing', or 'debugging'
+   * @returns {string|null} Provider name
+   */
+  selectProvider(mode = 'developing') {
+    const preferences = this.modePreferences[mode] || this.modePreferences.developing;
+
+    for (const provider of preferences) {
+      if (!this.providers[provider].available) {
+        continue;
+      }
+
+      const { quota, used } = this.providers[provider];
+      if (used < quota) {
+        return provider;
+      }
+    }
+
+    // All providers exhausted or unavailable
+    console.warn('[AIController] No providers available with remaining quota');
+    return null;
+  }
+
+  /**
+   * Start Ollama service (backward compatibility)
    */
   async start() {
-    if (!this.initialized) {
-      console.error('[AIController] Not initialized. Call initialize() first.');
-      return { success: false, reason: 'not_initialized' };
+    if (!this.providers.ollama.available) {
+      console.error('[AIController] Ollama not available');
+      return { success: false, reason: 'ollama_not_available' };
     }
 
     if (this.isRunning) {
-      console.log('[AIController] Already running');
+      console.log('[AIController] Ollama already running');
       return { success: true };
     }
 
     try {
       console.log(`[AIController] Starting Ollama service on port ${this.port}...`);
 
-      // Check if ollama is already running system-wide
       const runningPort = await this.checkExistingInstance();
       if (runningPort) {
         console.log(`[AIController] Found existing Ollama instance on port ${runningPort}`);
@@ -95,7 +213,6 @@ class AIController {
         return { success: true, usingExisting: true, port: runningPort };
       }
 
-      // Start our own instance
       await this.ollama.start({
         port: this.port,
         binPath: path.dirname(this.ollamaPath)
@@ -106,19 +223,17 @@ class AIController {
       return { success: true, port: this.port };
 
     } catch (error) {
-      console.error('[AIController] Failed to start:', error);
+      console.error('[AIController] Failed to start Ollama:', error);
       this.isRunning = false;
-      return { success: false, reason: 'start_error', error: error.message };
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Check for existing Ollama instance
-   * @returns {Promise<number|null>} Port if found, null otherwise
    */
   async checkExistingInstance() {
     try {
-      // Try common ports: default 11434, our custom 11435
       const portsToCheck = [11434, this.port];
 
       for (const port of portsToCheck) {
@@ -128,7 +243,7 @@ class AIController {
             return port;
           }
         } catch (error) {
-          // Port not responding, continue checking
+          // Port not responding
         }
       }
 
@@ -139,12 +254,11 @@ class AIController {
   }
 
   /**
-   * Stop the Ollama service
-   * @returns {Promise<Object>} Status of the operation
+   * Stop Ollama service
    */
   async stop() {
     if (!this.isRunning) {
-      console.log('[AIController] Not running');
+      console.log('[AIController] Ollama not running');
       return { success: true };
     }
 
@@ -160,108 +274,401 @@ class AIController {
       return { success: true };
 
     } catch (error) {
-      console.error('[AIController] Error stopping:', error);
+      console.error('[AIController] Error stopping Ollama:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Ask the AI a question
-   * @param {string} prompt - The question/prompt
-   * @param {Object} context - Optional context information
-   * @param {string} model - Model to use (default: system default)
-   * @returns {Promise<Object>} AI response
+   * Query Ollama directly
+   * @param {string} prompt - The prompt
+   * @param {string} model - Model to use
+   * @returns {Promise<Object>} Response
    */
-  async askAI(prompt, context = {}, model = null) {
+  async queryOllama(prompt, model = 'llama2') {
     if (!this.isRunning) {
-      return { success: false, reason: 'service_not_running' };
+      return { success: false, reason: 'ollama_not_running' };
     }
 
     try {
-      // Build the full prompt with context
-      const fullPrompt = context ? `${JSON.stringify(context)}\n\n${prompt}` : prompt;
-
-      // Make API call to Ollama
       const response = await fetch(`http://localhost:${this.port}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: model || 'llama2', // Default model
-          prompt: fullPrompt,
+          model,
+          prompt,
           stream: false
         })
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(`Ollama API error: ${response.status}`);
       }
 
       const data = await response.json();
       return {
         success: true,
         response: data.response,
-        model: data.model
+        model: data.model,
+        provider: 'ollama'
       };
 
     } catch (error) {
-      console.error('[AIController] Error querying AI:', error);
+      console.error('[AIController] Ollama query error:', error);
       return { success: false, error: error.message };
     }
   }
 
   /**
-   * Get service status
-   * @returns {Object} Current status
+   * Query Claude Code CLI
+   * @param {string} prompt - The prompt
+   * @returns {Promise<Object>} Response
    */
-  getStatus() {
+  async queryClaude(prompt) {
+    if (!this.providers.claude.available) {
+      return { success: false, reason: 'claude_not_available' };
+    }
+
+    try {
+      // Execute Claude Code CLI
+      // Note: This is a placeholder - actual CLI invocation depends on Claude's CLI API
+      const { stdout, stderr } = await execAsync(`claude-code --prompt "${prompt.replace(/"/g, '\\"')}"`);
+
+      if (stderr) {
+        console.warn('[AIController] Claude stderr:', stderr);
+      }
+
+      this.providers.claude.used++;
+
+      return {
+        success: true,
+        response: stdout.trim(),
+        provider: 'claude',
+        quotaRemaining: this.providers.claude.quota - this.providers.claude.used
+      };
+
+    } catch (error) {
+      console.error('[AIController] Claude query error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Query Gemini Code Assist CLI
+   * @param {string} prompt - The prompt
+   * @returns {Promise<Object>} Response
+   */
+  async queryGemini(prompt) {
+    if (!this.providers.gemini.available) {
+      return { success: false, reason: 'gemini_not_available' };
+    }
+
+    try {
+      // Execute Gemini Code Assist CLI
+      // Note: This is a placeholder - actual CLI invocation depends on Gemini's CLI API
+      const { stdout, stderr } = await execAsync(`gemini-code --prompt "${prompt.replace(/"/g, '\\"')}"`);
+
+      if (stderr) {
+        console.warn('[AIController] Gemini stderr:', stderr);
+      }
+
+      this.providers.gemini.used++;
+
+      return {
+        success: true,
+        response: stdout.trim(),
+        provider: 'gemini',
+        quotaRemaining: this.providers.gemini.quota - this.providers.gemini.used
+      };
+
+    } catch (error) {
+      console.error('[AIController] Gemini query error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Query AI with automatic provider selection
+   * @param {string} prompt - The prompt
+   * @param {Object} options - Options
+   * @param {string} options.mode - 'planning', 'developing', or 'debugging'
+   * @param {string} options.provider - Force specific provider
+   * @param {string} options.model - Model to use (Ollama only)
+   * @returns {Promise<Object>} Response
+   */
+  async queryAI(prompt, options = {}) {
+    const { mode = 'developing', provider = null, model = 'llama2' } = options;
+
+    // Select provider
+    const selectedProvider = provider || this.selectProvider(mode);
+
+    if (!selectedProvider) {
+      return {
+        success: false,
+        error: 'No providers available or all quotas exhausted'
+      };
+    }
+
+    console.log(`[AIController] Using provider: ${selectedProvider} (mode: ${mode})`);
+
+    // Route to appropriate provider
+    switch (selectedProvider) {
+      case 'ollama':
+        return await this.queryOllama(prompt, model);
+      case 'claude':
+        return await this.queryClaude(prompt);
+      case 'gemini':
+        return await this.queryGemini(prompt);
+      default:
+        return { success: false, error: `Unknown provider: ${selectedProvider}` };
+    }
+  }
+
+  /**
+   * GAN Refinement Loop - Iterative improvement
+   * @param {string} initialPrompt - The task description
+   * @param {Object} options - Options
+   * @param {number} options.rounds - Number of refinement rounds (default: 2)
+   * @param {string} options.mode - Mode for routing
+   * @returns {Promise<Object>} Final refined response
+   */
+  async ganRefine(initialPrompt, options = {}) {
+    const { rounds = this.ganSettings.rounds, mode = 'developing' } = options;
+
+    if (!this.ganSettings.enabled) {
+      console.log('[AIController] GAN refinement disabled, using single-pass');
+      return await this.queryAI(initialPrompt, { mode });
+    }
+
+    console.log(`[AIController] Starting GAN refinement (${rounds} rounds)`);
+
+    let currentOutput = null;
+    let history = [];
+
+    for (let round = 1; round <= rounds; round++) {
+      console.log(`[AIController] GAN Round ${round}/${rounds}`);
+
+      if (round === 1) {
+        // Round 1: Initial generation
+        const architectPrompt = `${initialPrompt}\n\nIMPORTANT: Generate production-ready code with proper error handling, validation, and robustness. Avoid "vanilla" or minimal implementations.`;
+
+        const result = await this.queryAI(architectPrompt, {
+          mode,
+          provider: this.ganSettings.architectModel
+        });
+
+        if (!result.success) {
+          return result;
+        }
+
+        currentOutput = result.response;
+        history.push({ round: 1, role: 'architect', output: currentOutput });
+
+      } else {
+        // Round 2+: Critique and refine
+        const critiquePrompt = `You are a senior code reviewer. Analyze the following code for:
+1. Robustness: Does it handle edge cases?
+2. Idempotency: Can it be run multiple times safely?
+3. Clarity: Are error messages actionable?
+4. Efficiency: Are there redundant operations?
+5. Security: Are there injection risks?
+
+Previous output:
+${currentOutput}
+
+Original task:
+${initialPrompt}
+
+Provide a critiqued and improved version of the code.`;
+
+        const critiqueResult = await this.queryAI(critiquePrompt, {
+          mode,
+          provider: this.ganSettings.critiqueModel
+        });
+
+        if (!critiqueResult.success) {
+          console.warn(`[AIController] GAN round ${round} failed, using previous output`);
+          break;
+        }
+
+        currentOutput = critiqueResult.response;
+        history.push({ round, role: 'critic', output: currentOutput });
+      }
+    }
+
+    console.log('[AIController] GAN refinement complete');
+
     return {
-      initialized: this.initialized,
-      running: this.isRunning,
-      port: this.port,
-      binaryPath: this.ollamaPath
+      success: true,
+      response: currentOutput,
+      history,
+      rounds: history.length,
+      provider: 'gan-refined'
     };
   }
 
   /**
-   * Setup IPC handlers for AI operations
-   * @param {IpcRouter} ipcRouter - IPC router instance
+   * Agentic Code Generation - High-level interface for Epic 8
+   * @param {string} task - Natural language task description
+   * @param {string} mode - 'planning', 'developing', or 'debugging'
+   * @param {Object} options - Additional options
+   * @returns {Promise<Object>} AI response
+   */
+  async agenticCode(task, mode = 'developing', options = {}) {
+    const { useGAN = true, context = {} } = options;
+
+    console.log(`[AIController] Agentic Code Request - Mode: ${mode}, GAN: ${useGAN}`);
+
+    // Build enhanced prompt with context
+    let enhancedPrompt = task;
+
+    if (context.hardware) {
+      enhancedPrompt += `\n\nSystem Hardware:\n${context.hardware}`;
+    }
+
+    if (context.files) {
+      enhancedPrompt += `\n\nRelevant Files:\n${context.files}`;
+    }
+
+    if (context.error) {
+      enhancedPrompt += `\n\nError Context:\n${context.error}`;
+    }
+
+    // Use GAN refinement if enabled and appropriate
+    if (useGAN && mode !== 'debugging') {
+      return await this.ganRefine(enhancedPrompt, { mode });
+    }
+
+    // Single-pass query
+    return await this.queryAI(enhancedPrompt, { mode });
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   * @deprecated Use queryAI() or agenticCode() instead
+   */
+  async askAI(prompt, context = {}, model = null) {
+    console.warn('[AIController] askAI() is deprecated, use queryAI() or agenticCode()');
+
+    // Build full prompt with context
+    const fullPrompt = context && Object.keys(context).length > 0
+      ? `${JSON.stringify(context)}\n\n${prompt}`
+      : prompt;
+
+    return await this.queryAI(fullPrompt, { model });
+  }
+
+  /**
+   * Get service status
+   */
+  getStatus() {
+    return {
+      initialized: this.initialized,
+      ollama: {
+        running: this.isRunning,
+        port: this.port,
+        binaryPath: this.ollamaPath
+      },
+      providers: Object.keys(this.providers).reduce((acc, key) => {
+        acc[key] = {
+          available: this.providers[key].available,
+          quota: this.providers[key].quota,
+          used: this.providers[key].used,
+          remaining: this.providers[key].quota - this.providers[key].used
+        };
+        return acc;
+      }, {}),
+      gan: this.ganSettings
+    };
+  }
+
+  /**
+   * Update GAN settings
+   */
+  updateGANSettings(settings = {}) {
+    this.ganSettings = { ...this.ganSettings, ...settings };
+    console.log('[AIController] GAN settings updated:', this.ganSettings);
+    return { success: true, settings: this.ganSettings };
+  }
+
+  /**
+   * Update mode preferences
+   */
+  updateModePreferences(mode, preferences) {
+    if (!this.modePreferences[mode]) {
+      return { success: false, error: `Invalid mode: ${mode}` };
+    }
+
+    this.modePreferences[mode] = preferences;
+    console.log(`[AIController] Mode preferences updated for ${mode}:`, preferences);
+    return { success: true };
+  }
+
+  /**
+   * Setup IPC handlers
    */
   setupIpcHandlers(ipcRouter) {
-    // Initialize AI
+    // Legacy handlers (backward compatibility)
     ipcRouter.handle('ai:initialize', async (event, options) => {
       return await this.initialize(options);
     });
 
-    // Start AI service
     ipcRouter.handle('ai:start', async () => {
       return await this.start();
     });
 
-    // Stop AI service
     ipcRouter.handle('ai:stop', async () => {
       return await this.stop();
     });
 
-    // Query AI
     ipcRouter.handle('ai:ask', async (event, { prompt, context, model }) => {
       return await this.askAI(prompt, context, model);
     });
 
-    // Get status
     ipcRouter.handle('ai:status', async () => {
       return this.getStatus();
     });
 
-    console.log('[AIController] IPC handlers registered');
+    // New Epic 8 handlers
+    ipcRouter.handle('ai:query', async (event, { prompt, options }) => {
+      return await this.queryAI(prompt, options);
+    });
+
+    ipcRouter.handle('ai:agentic-code', async (event, { task, mode, options }) => {
+      return await this.agenticCode(task, mode, options);
+    });
+
+    ipcRouter.handle('ai:gan-refine', async (event, { prompt, options }) => {
+      return await this.ganRefine(prompt, options);
+    });
+
+    ipcRouter.handle('ai:update-gan-settings', async (event, settings) => {
+      return this.updateGANSettings(settings);
+    });
+
+    ipcRouter.handle('ai:update-mode-preferences', async (event, { mode, preferences }) => {
+      return this.updateModePreferences(mode, preferences);
+    });
+
+    ipcRouter.handle('ai:get-providers', async () => {
+      return { success: true, providers: this.getAvailableProviders() };
+    });
+
+    console.log('[AIController] IPC handlers registered (Epic 8 enhanced)');
   }
 
   /**
    * Cleanup on shutdown
    */
   async destroy() {
+    // Stop Ollama
     if (this.isRunning) {
       await this.stop();
     }
+
+    // Clear quota reset timers
+    Object.values(this.quotaResetTimers).forEach(timer => clearInterval(timer));
+
     this.initialized = false;
     console.log('[AIController] Service destroyed');
   }

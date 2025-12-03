@@ -415,47 +415,96 @@ Analyze the commands above and respond with JSON:`;
    * @param {string} params.model - LLM model (optional)
    * @returns {Promise<Object>} Suggested fixes
    */
+  /**
+   * Analyze installation errors using structured debugging methodology
+   * Epic 8: The Awakened Mind - 5 Whys Root Cause Analysis
+   * @param {Object} params - Error analysis parameters
+   * @returns {Promise<Object>} Detailed root cause analysis with fixes
+   */
   async analyzeError(params) {
     const { errorLog, originalManifest, model } = params;
+    const fs = require('fs');
+    const path = require('path');
 
     try {
-      const prompt = `You are the Pinokio AI Error Analyst.
+      // Load DebugGuide.txt template
+      let debugGuide = '';
+      const debugGuidePath = path.join(__dirname, '..', '..', 'resources', 'DebugGuide.txt');
 
-Original Installation Manifest:
+      if (fs.existsSync(debugGuidePath)) {
+        debugGuide = fs.readFileSync(debugGuidePath, 'utf8');
+        console.log('[ForgeService] Loaded DebugGuide.txt for structured analysis');
+      } else {
+        console.warn('[ForgeService] DebugGuide.txt not found, using basic analysis');
+      }
+
+      // Get hardware context
+      const HardwareService = require('./HardwareService');
+      const hardwareSummary = await HardwareService.getHardwareSummary();
+
+      // Build enhanced debugging prompt
+      const prompt = `You are the Pinokio AI Debugging Expert. Use the structured debugging methodology below to perform ROOT CAUSE ANALYSIS.
+
+=== DEBUG GUIDE ===
+${debugGuide}
+
+=== SYSTEM HARDWARE ===
+${hardwareSummary}
+
+=== ORIGINAL INSTALLATION MANIFEST ===
 ${originalManifest.toJSON(true)}
 
-Installation Error Log:
-${errorLog}
+=== INSTALLATION ERROR LOG ===
+${errorLog.slice(0, 3000)}
 
-Task:
-1. Analyze what went wrong
-2. Suggest specific fixes to the installation commands
-3. Identify if dependencies are missing
-4. Propose an updated manifest
+=== YOUR TASK ===
+Using the 5 WHYS TECHNIQUE from the Debug Guide:
+
+1. **Classify the Error** (Logic/Runtime/Configuration/Integration)
+2. **Apply 5 Whys Analysis** to drill down to root cause
+3. **Identify Solution Pattern** from the Debug Guide (section 3)
+4. **Generate Fix** with proper error handling and validation
+5. **Validate Fix** - ensure it addresses root cause, not symptom
 
 Output Format (JSON):
 {
-  "diagnosis": "string (what went wrong)",
-  "fixes": [
-    "suggested fix 1",
-    "suggested fix 2"
+  "errorType": "string (Logic/Runtime/Configuration/Integration)",
+  "symptom": "string (observable problem)",
+  "fiveWhys": [
+    {"question": "Why #1", "answer": "...", "evidence": "..."},
+    {"question": "Why #2", "answer": "...", "evidence": "..."},
+    {"question": "Why #3", "answer": "...", "evidence": "..."},
+    {"question": "Why #4", "answer": "...", "evidence": "..."},
+    {"question": "Why #5 - ROOT CAUSE", "answer": "...", "evidence": "..."}
   ],
-  "updatedCommands": [
-    "corrected command 1",
-    "corrected command 2"
-  ],
-  "additionalDependencies": ["dep1", "dep2"]
+  "rootCause": "string (the core fixable problem)",
+  "solutionPattern": "string (pattern name from Debug Guide)",
+  "diagnosis": "string (summary of root cause analysis)",
+  "fixes": ["specific fix 1", "specific fix 2"],
+  "updatedCommands": ["corrected command 1", "corrected command 2"],
+  "additionalDependencies": ["dep1", "dep2"],
+  "preventionStrategy": "string (how to avoid this class of errors)"
 }
 
-Analyze and respond with JSON:`;
+Provide detailed ROOT CAUSE ANALYSIS in JSON format:`;
 
-      const aiResponse = await AIController.askAI(prompt, {
-        task: 'error_analysis',
-        errorLog: errorLog.slice(0, 2000) // Limit log size
-      }, model);
+      // Use Epic 8 AIController with debugging mode
+      console.log('[ForgeService] Starting structured debugging analysis...');
+
+      const aiResponse = await AIController.agenticCode(
+        prompt,
+        'debugging',  // Mode: debugging (routes to Ollama first for cost savings)
+        {
+          useGAN: false,  // Single-pass for debugging (speed over refinement)
+          context: {
+            hardware: hardwareSummary,
+            error: errorLog.slice(0, 1000)
+          }
+        }
+      );
 
       if (!aiResponse.success) {
-        throw new Error(`AI error analysis failed: ${aiResponse.error}`);
+        throw new Error(`AI debugging analysis failed: ${aiResponse.error}`);
       }
 
       // Parse response
@@ -469,18 +518,36 @@ Analyze and respond with JSON:`;
 
       const analysis = JSON.parse(jsonStr);
 
+      // Validate that we have root cause analysis
+      if (!analysis.fiveWhys || !analysis.rootCause) {
+        console.warn('[ForgeService] AI did not provide complete 5 Whys analysis');
+      }
+
+      console.log('[ForgeService] Root cause identified:', analysis.rootCause);
+      console.log('[ForgeService] Solution pattern:', analysis.solutionPattern);
+
       return {
         success: true,
+        errorType: analysis.errorType || 'Unknown',
+        symptom: analysis.symptom || 'Unknown symptom',
+        fiveWhys: analysis.fiveWhys || [],
+        rootCause: analysis.rootCause || 'Unable to determine root cause',
+        solutionPattern: analysis.solutionPattern || 'Unknown',
         diagnosis: analysis.diagnosis,
         fixes: analysis.fixes || [],
         updatedCommands: analysis.updatedCommands || [],
-        additionalDependencies: analysis.additionalDependencies || []
+        additionalDependencies: analysis.additionalDependencies || [],
+        preventionStrategy: analysis.preventionStrategy || 'None specified',
+        provider: aiResponse.provider || 'unknown',
+        timestamp: new Date().toISOString()
       };
 
     } catch (error) {
+      console.error('[ForgeService] Error analysis failed:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        fallbackDiagnosis: 'Structured analysis failed - check logs for details'
       };
     }
   }

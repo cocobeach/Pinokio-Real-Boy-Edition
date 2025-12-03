@@ -18,6 +18,7 @@ const ForgeService = require('../services/ForgeService');
 const KernelPatcher = require('../services/KernelPatcher'); // Phase 5: The Deep Hook
 const GitService = require('../services/GitService'); // Epic 7: Agentic IDE - Git
 const FileSystemService = require('../services/FileSystemService'); // Epic 7: Agentic IDE - Filesystem
+const HardwareService = require('../services/HardwareService'); // Epic 8: The Awakened Mind - Hardware Monitoring
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -323,6 +324,53 @@ class AppController {
 
     // FileSystem Service handlers (Epic 7: The Agentic IDE)
     FileSystemService.setupIpcHandlers(IpcRouter);
+
+    // Hardware Service handlers (Epic 8: The Awakened Mind)
+    HardwareService.setupIpcHandlers(IpcRouter);
+
+    // ConfigService handlers (Epic 8: Configuration Management)
+    IpcRouter.handle('config:get-provider-preferences', async () => {
+      return { success: true, preferences: ConfigService.getAIProviderPreferences() };
+    });
+    IpcRouter.handle('config:set-provider-preferences', async (event, prefs) => {
+      ConfigService.setAIProviderPreferences(prefs);
+      return { success: true };
+    });
+    IpcRouter.handle('config:get-mode-preferences', async () => {
+      return { success: true, preferences: ConfigService.getModePreferences() };
+    });
+    IpcRouter.handle('config:set-mode-preferences', async (event, prefs) => {
+      ConfigService.setModePreferences(prefs);
+      return { success: true };
+    });
+    IpcRouter.handle('config:get-gan-settings', async () => {
+      return { success: true, settings: ConfigService.getGANSettings() };
+    });
+    IpcRouter.handle('config:set-gan-settings', async (event, settings) => {
+      ConfigService.setGANSettings(settings);
+      return { success: true };
+    });
+    IpcRouter.handle('config:get-quota-settings', async () => {
+      return { success: true, settings: ConfigService.getQuotaSettings() };
+    });
+    IpcRouter.handle('config:set-quota-settings', async (event, settings) => {
+      ConfigService.setQuotaSettings(settings);
+      return { success: true };
+    });
+    IpcRouter.handle('config:get-hardware-settings', async () => {
+      return { success: true, settings: ConfigService.getHardwareSettings() };
+    });
+    IpcRouter.handle('config:set-hardware-settings', async (event, settings) => {
+      ConfigService.setHardwareSettings(settings);
+      return { success: true };
+    });
+    IpcRouter.handle('config:get-epic8-config', async () => {
+      return { success: true, config: ConfigService.getEpic8Config() };
+    });
+    IpcRouter.handle('config:reset-epic8-config', async () => {
+      ConfigService.resetEpic8Config();
+      return { success: true };
+    });
 
     // Custom prompt handler (from original full.js)
     IpcRouter.on('prompt', (eventRet, arg) => {
