@@ -179,6 +179,15 @@ window.electronAPI = {
     saveFile: (params) => ipcRenderer.invoke('file:save', params),
     getMetadata: (params) => ipcRenderer.invoke('file:metadata', params),
   },
+
+  // Plan Executor APIs (BMAD Architecture - Epic 9: The Synergistic Forge)
+  planExecutor: {
+    execute: (params) => ipcRenderer.invoke('plan-executor:execute', params),
+    status: (params) => ipcRenderer.invoke('plan-executor:status', params),
+    cancel: (params) => ipcRenderer.invoke('plan-executor:cancel', params),
+    history: () => ipcRenderer.invoke('plan-executor:history'),
+    onProgress: (callback) => ipcRenderer.on('plan-executor:progress', (event, data) => callback(data)),
+  },
 }
 
 ;(function initInspector() {

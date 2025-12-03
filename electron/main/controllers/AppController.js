@@ -19,6 +19,7 @@ const KernelPatcher = require('../services/KernelPatcher'); // Phase 5: The Deep
 const GitService = require('../services/GitService'); // Epic 7: Agentic IDE - Git
 const FileSystemService = require('../services/FileSystemService'); // Epic 7: Agentic IDE - Filesystem
 const HardwareService = require('../services/HardwareService'); // Epic 8: The Awakened Mind - Hardware Monitoring
+const PlanExecutor = require('../services/PlanExecutor'); // Epic 9: The Synergistic Forge - Plan Automation
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -371,6 +372,9 @@ class AppController {
       ConfigService.resetEpic8Config();
       return { success: true };
     });
+
+    // Plan Executor handlers (Epic 9: The Synergistic Forge)
+    PlanExecutor.setupIpcHandlers(IpcRouter);
 
     // Custom prompt handler (from original full.js)
     IpcRouter.on('prompt', (eventRet, arg) => {
