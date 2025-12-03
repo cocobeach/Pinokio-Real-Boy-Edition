@@ -50,6 +50,7 @@
       cursor: pointer;
       transition: background 0.2s ease;
       font-size: 24px;
+      position: relative;
     }
 
     #native-sidebar .nav-icon:hover {
@@ -59,6 +60,265 @@
     #native-sidebar .nav-icon.active {
       background: rgba(59, 130, 246, 0.3);
       border: 1px solid rgba(59, 130, 246, 0.5);
+    }
+
+    #native-sidebar .nav-icon .badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #ef4444;
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      min-width: 16px;
+      height: 16px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+    }
+
+    /* RIGHT PANEL: Info Sidebar (Epic 9) */
+    #info-sidebar {
+      width: 320px;
+      min-width: 320px;
+      background: linear-gradient(180deg, #252526 0%, #1e1e1e 100%);
+      border-left: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      transform: translateX(0);
+      transition: transform 0.3s ease;
+      z-index: 90;
+    }
+
+    #info-sidebar.collapsed {
+      transform: translateX(320px);
+    }
+
+    #info-sidebar .sidebar-header {
+      height: 48px;
+      background: #2d2d2d;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      flex-shrink: 0;
+    }
+
+    #info-sidebar .sidebar-header .title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #cccccc;
+    }
+
+    #info-sidebar .sidebar-header .collapse-btn {
+      cursor: pointer;
+      font-size: 18px;
+      opacity: 0.7;
+      transition: opacity 0.2s;
+    }
+
+    #info-sidebar .sidebar-header .collapse-btn:hover {
+      opacity: 1;
+    }
+
+    /* Widget Styles */
+    .widget {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      margin: 12px;
+      padding: 16px;
+    }
+
+    .widget-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .widget-title .refresh-btn {
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0.5;
+      transition: opacity 0.2s;
+    }
+
+    .widget-title .refresh-btn:hover {
+      opacity: 1;
+    }
+
+    /* Git Status Widget */
+    .git-branch {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+    }
+
+    .git-branch .branch-icon {
+      font-size: 16px;
+    }
+
+    .git-branch .branch-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: #4ec9b0;
+      font-family: 'Courier New', monospace;
+    }
+
+    .git-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .git-stat {
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .git-stat .count {
+      font-size: 16px;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .git-stat.staged .count { color: #10b981; }
+    .git-stat.modified .count { color: #f59e0b; }
+    .git-stat.untracked .count { color: #6b7280; }
+
+    .git-stat .label {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    /* Task List Widget */
+    .task-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+      border-left: 3px solid #6b7280;
+      transition: all 0.2s;
+    }
+
+    .task-item.completed {
+      border-left-color: #10b981;
+      opacity: 0.7;
+    }
+
+    .task-item.in-progress {
+      border-left-color: #3b82f6;
+      animation: pulse 2s infinite;
+    }
+
+    .task-item.failed {
+      border-left-color: #ef4444;
+    }
+
+    .task-item .task-icon {
+      font-size: 16px;
+      margin-top: 2px;
+    }
+
+    .task-item .task-content {
+      flex: 1;
+    }
+
+    .task-item .task-id {
+      font-size: 10px;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    .task-item .task-desc {
+      font-size: 12px;
+      color: #cccccc;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* Hardware Widget */
+    .hardware-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 6px;
+    }
+
+    .hardware-item .hw-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .hardware-item .hw-value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #cccccc;
+      font-family: 'Courier New', monospace;
+    }
+
+    .hardware-bar {
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .hardware-bar .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #10b981, #3b82f6);
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    .hardware-bar .bar-fill.warning {
+      background: linear-gradient(90deg, #f59e0b, #ef4444);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 24px 12px;
+      color: #666;
+      font-size: 12px;
+    }
+
+    .empty-state .icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+      opacity: 0.5;
     }
 
     /* MIDDLE PANE: Web App + Terminal */
@@ -207,6 +467,9 @@
     <!-- LEFT: Native Sidebar -->
     <div id="native-sidebar">
       <div class="nav-icon active" id="nav-home" title="Home">🏠</div>
+      <div class="nav-icon" id="nav-info" title="Info Panel">📊
+        <span class="badge hidden" id="task-badge">0</span>
+      </div>
       <div class="nav-icon" id="nav-terminal" title="Terminal">⌨️</div>
       <div class="nav-icon" id="nav-settings" title="Settings">⚙️</div>
     </div>
@@ -237,6 +500,56 @@
         </div>
       </div>
     </div>
+
+    <!-- RIGHT: Info Sidebar (Epic 9) -->
+    <div id="info-sidebar" class="collapsed">
+      <div class="sidebar-header">
+        <div class="title">📊 Command Center</div>
+        <div class="collapse-btn" id="sidebar-collapse">❮</div>
+      </div>
+
+      <!-- Git Status Widget -->
+      <div class="widget" id="git-widget">
+        <div class="widget-title">
+          <span>🌿 Git Status</span>
+          <span class="refresh-btn" id="refresh-git" title="Refresh">↻</span>
+        </div>
+        <div id="git-content">
+          <div class="empty-state">
+            <div class="icon">🔍</div>
+            <div>No Git repository detected</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Plan Widget -->
+      <div class="widget" id="plan-widget">
+        <div class="widget-title">
+          <span>📋 Active Plan</span>
+          <span class="refresh-btn" id="refresh-plan" title="Refresh">↻</span>
+        </div>
+        <div id="plan-content">
+          <div class="empty-state">
+            <div class="icon">📝</div>
+            <div>No active plan</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hardware Widget -->
+      <div class="widget" id="hardware-widget">
+        <div class="widget-title">
+          <span>💻 Hardware</span>
+          <span class="refresh-btn" id="refresh-hardware" title="Refresh">↻</span>
+        </div>
+        <div id="hardware-content">
+          <div class="empty-state">
+            <div class="icon">⏳</div>
+            <div>Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -248,16 +561,17 @@
 
     console.log('[Command Center] Root URL:', rootUrl);
 
-    // Initialize webview
+    // Elements
     const webview = document.getElementById('pinokiod-webview');
     const terminalDrawer = document.getElementById('terminal-drawer');
     const terminalContent = document.getElementById('terminal-content');
     const loadingOverlay = document.getElementById('loading-overlay');
+    const infoSidebar = document.getElementById('info-sidebar');
+    const taskBadge = document.getElementById('task-badge');
 
     // Wait for webview to be ready
     webview.addEventListener('dom-ready', () => {
       console.log('[Command Center] Webview DOM ready');
-      // Hide loading overlay after a short delay
       setTimeout(() => {
         loadingOverlay.classList.add('hidden');
       }, 500);
@@ -273,7 +587,7 @@
     webview.src = rootUrl;
 
     // Terminal Drawer Controls
-    let terminalState = 'closed'; // closed, open, maximized
+    let terminalState = 'closed';
 
     function openTerminal() {
       terminalDrawer.classList.add('open');
@@ -308,6 +622,26 @@
     });
     document.getElementById('terminal-close').addEventListener('click', closeTerminal);
 
+    // Info Sidebar Controls
+    let sidebarState = 'collapsed';
+
+    function toggleSidebar() {
+      if (sidebarState === 'collapsed') {
+        infoSidebar.classList.remove('collapsed');
+        document.getElementById('sidebar-collapse').textContent = '❯';
+        document.getElementById('nav-info').classList.add('active');
+        sidebarState = 'open';
+      } else {
+        infoSidebar.classList.add('collapsed');
+        document.getElementById('sidebar-collapse').textContent = '❮';
+        document.getElementById('nav-info').classList.remove('active');
+        sidebarState = 'collapsed';
+      }
+    }
+
+    document.getElementById('nav-info').addEventListener('click', toggleSidebar);
+    document.getElementById('sidebar-collapse').addEventListener('click', toggleSidebar);
+
     // Navigation Icons
     document.getElementById('nav-home').addEventListener('click', () => {
       console.log('[Command Center] Navigate to Home');
@@ -327,6 +661,233 @@
       console.log('[Command Center] Navigate to Settings');
       webview.src = rootUrl + '/settings';
     });
+
+    // === EPIC 9: SIDEBAR WIDGETS ===
+
+    // Git Status Widget
+    async function refreshGitStatus() {
+      if (!window.electronAPI) return;
+
+      try {
+        // Get current working directory from a typical location
+        const workingDir = process.cwd ? process.cwd() : null;
+        if (!workingDir) {
+          document.getElementById('git-content').innerHTML = `
+            <div class="empty-state">
+              <div class="icon">🔍</div>
+              <div>No working directory</div>
+            </div>
+          `;
+          return;
+        }
+
+        const gitStatus = await window.electronAPI.git.status({ path: workingDir });
+
+        if (!gitStatus.success || !gitStatus.status) {
+          document.getElementById('git-content').innerHTML = `
+            <div class="empty-state">
+              <div class="icon">🔍</div>
+              <div>No Git repository</div>
+            </div>
+          `;
+          return;
+        }
+
+        const status = gitStatus.status;
+        const staged = status.staged?.length || 0;
+        const modified = status.modified?.length || 0;
+        const untracked = status.untracked?.length || 0;
+
+        document.getElementById('git-content').innerHTML = `
+          <div class="git-branch">
+            <span class="branch-icon">🌿</span>
+            <span class="branch-name">${status.branch || 'main'}</span>
+          </div>
+          <div class="git-stats">
+            <div class="git-stat staged">
+              <span class="count">${staged}</span>
+              <span class="label">Staged</span>
+            </div>
+            <div class="git-stat modified">
+              <span class="count">${modified}</span>
+              <span class="label">Modified</span>
+            </div>
+            <div class="git-stat untracked">
+              <span class="count">${untracked}</span>
+              <span class="label">New</span>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('[Git Widget] Error:', error);
+      }
+    }
+
+    // Active Plan Widget
+    async function refreshActivePlan() {
+      if (!window.electronAPI || !window.electronAPI.planExecutor) return;
+
+      try {
+        // Get active plans (this would need planId tracking in real implementation)
+        const history = await window.electronAPI.planExecutor.history();
+
+        if (!history.success || !history.history || history.history.length === 0) {
+          document.getElementById('plan-content').innerHTML = `
+            <div class="empty-state">
+              <div class="icon">📝</div>
+              <div>No active plan</div>
+            </div>
+          `;
+          taskBadge.classList.add('hidden');
+          return;
+        }
+
+        // Show most recent plan
+        const plan = history.history[0];
+        const tasks = plan.plan.tasks || [];
+        const completed = plan.completedTasks?.length || 0;
+        const failed = plan.failedTasks?.length || 0;
+        const pending = tasks.length - completed - failed;
+
+        // Update badge
+        if (pending > 0) {
+          taskBadge.textContent = pending;
+          taskBadge.classList.remove('hidden');
+        } else {
+          taskBadge.classList.add('hidden');
+        }
+
+        let tasksHTML = '';
+        tasks.forEach((task, i) => {
+          const isCompleted = plan.completedTasks?.find(t => t.taskId === task.id);
+          const isFailed = plan.failedTasks?.find(t => t.taskId === task.id);
+          const isInProgress = i === plan.currentTaskIndex && plan.status === 'running';
+
+          let status = 'pending';
+          let icon = '⏸';
+          if (isCompleted) {
+            status = 'completed';
+            icon = '✓';
+          } else if (isFailed) {
+            status = 'failed';
+            icon = '✗';
+          } else if (isInProgress) {
+            status = 'in-progress';
+            icon = '⏳';
+          }
+
+          tasksHTML += `
+            <div class="task-item ${status}">
+              <div class="task-icon">${icon}</div>
+              <div class="task-content">
+                <div class="task-id">Task ${task.id}</div>
+                <div class="task-desc">${task.description}</div>
+              </div>
+            </div>
+          `;
+        });
+
+        document.getElementById('plan-content').innerHTML = tasksHTML;
+      } catch (error) {
+        console.error('[Plan Widget] Error:', error);
+      }
+    }
+
+    // Hardware Widget
+    async function refreshHardware() {
+      if (!window.electronAPI || !window.electronAPI.hardware) return;
+
+      try {
+        const hardware = await window.electronAPI.hardware.getSystem();
+
+        if (!hardware.success) {
+          document.getElementById('hardware-content').innerHTML = `
+            <div class="empty-state">
+              <div class="icon">❌</div>
+              <div>Hardware info unavailable</div>
+            </div>
+          `;
+          return;
+        }
+
+        let hardwareHTML = '';
+
+        // GPUs
+        if (hardware.gpu && hardware.gpu.available && hardware.gpu.devices) {
+          hardware.gpu.devices.forEach((gpu, i) => {
+            const usage = gpu.memory.usagePercent || 0;
+            const warningClass = usage > 80 ? 'warning' : '';
+            hardwareHTML += `
+              <div class="hardware-item">
+                <div>
+                  <div class="hw-label">GPU ${i}: ${gpu.name}</div>
+                  <div class="hw-value">${gpu.memory.used}MB / ${gpu.memory.total}MB</div>
+                  <div class="hardware-bar">
+                    <div class="bar-fill ${warningClass}" style="width: ${usage}%"></div>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        // CPU
+        if (hardware.cpu) {
+          const cpuUsage = hardware.cpu.memory.usagePercent || 0;
+          hardwareHTML += `
+            <div class="hardware-item">
+              <div style="width: 100%;">
+                <div class="hw-label">CPU</div>
+                <div class="hw-value">${hardware.cpu.cores} cores @ ${hardware.cpu.speed}MHz</div>
+              </div>
+            </div>
+          `;
+
+          // RAM
+          hardwareHTML += `
+            <div class="hardware-item">
+              <div style="width: 100%;">
+                <div class="hw-label">RAM</div>
+                <div class="hw-value">${hardware.cpu.memory.used}GB / ${hardware.cpu.memory.total}GB</div>
+                <div class="hardware-bar">
+                  <div class="bar-fill ${cpuUsage > 80 ? 'warning' : ''}" style="width: ${cpuUsage}%"></div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        document.getElementById('hardware-content').innerHTML = hardwareHTML || `
+          <div class="empty-state">
+            <div class="icon">💻</div>
+            <div>No hardware data</div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('[Hardware Widget] Error:', error);
+      }
+    }
+
+    // Refresh buttons
+    document.getElementById('refresh-git').addEventListener('click', refreshGitStatus);
+    document.getElementById('refresh-plan').addEventListener('click', refreshActivePlan);
+    document.getElementById('refresh-hardware').addEventListener('click', refreshHardware);
+
+    // Auto-refresh every 5 seconds
+    setInterval(() => {
+      if (sidebarState === 'open') {
+        refreshGitStatus();
+        refreshActivePlan();
+        refreshHardware();
+      }
+    }, 5000);
+
+    // Initial load
+    setTimeout(() => {
+      refreshGitStatus();
+      refreshActivePlan();
+      refreshHardware();
+    }, 1000);
 
     // CRITICAL: IPC Handler for Terminal Hijack Prevention
     if (window.electronAPI && window.electronAPI.onCommandCenter) {
@@ -356,6 +917,7 @@
     }
 
     console.log('[Command Center] Initialization complete');
+    console.log('[Command Center] Epic 9 Sidebar Features: Git Status, Active Plan, Hardware Monitoring');
   </script>
 </body>
 </html>
