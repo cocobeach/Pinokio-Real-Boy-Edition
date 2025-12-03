@@ -6,62 +6,123 @@
 
 const pty = require('node-pty');
 const os = require('os');
+const path = require('path');
+const fs = require('fs');
 
 class PTYController {
   constructor() {
     this.sessions = new Map();
     this.nextId = 1;
+
+    // CRITICAL FIX: Detect actual Pinokio installation path
+    // Handles portable installs (F: drive) and standard installs (C: drive)
+    this.pinokioHome = this.detectPinokioHome();
+    console.log(`[PTYController] Detected Pinokio Home: ${this.pinokioHome}`);
+  }
+
+  /**
+   * Detect where Pinokio is actually installed
+   * Handles:
+   * - Portable installations (F:\pinokio)
+   * - Standard user installations (C:\Users\...\pinokio)
+   * - Development environments (anywhere with /pinokio/ in path)
+   * @returns {string} Absolute path to pinokio root directory
+   */
+  detectPinokioHome() {
+    // Strategy 1: Walk up from current directory to find 'pinokio' folder with bin/api
+    let current = __dirname;
+    while (current !== path.parse(current).root) {
+      // Check if this directory is named 'pinokio' and has bin/api subdirectories
+      if (path.basename(current).toLowerCase() === 'pinokio') {
+        if (fs.existsSync(path.join(current, 'bin')) || fs.existsSync(path.join(current, 'api'))) {
+          console.log('[PTYController] Found Pinokio root by walking up from __dirname');
+          return current;
+        }
+      }
+
+      // Check if current directory has both bin and api (common in portable installs)
+      if (fs.existsSync(path.join(current, 'bin')) && fs.existsSync(path.join(current, 'api'))) {
+        console.log('[PTYController] Found Pinokio root by bin+api detection');
+        return current;
+      }
+
+      current = path.dirname(current);
+    }
+
+    // Strategy 2: Check the drive where the executable is located (F: drive scenario)
+    const appPath = process.execPath; // e.g., F:\pinokio\Pinokio.exe
+    const driveRoot = path.parse(appPath).root; // F:\
+    const drivePinokio = path.join(driveRoot, 'pinokio');
+
+    if (fs.existsSync(path.join(drivePinokio, 'bin')) || fs.existsSync(path.join(drivePinokio, 'api'))) {
+      console.log(`[PTYController] Found Pinokio root on same drive as executable: ${drivePinokio}`);
+      return drivePinokio;
+    }
+
+    // Strategy 3: Check parent directory of executable (portable adjacent)
+    const exeDir = path.dirname(appPath);
+    if (fs.existsSync(path.join(exeDir, 'bin')) && fs.existsSync(path.join(exeDir, 'api'))) {
+      console.log(`[PTYController] Found Pinokio root adjacent to executable: ${exeDir}`);
+      return exeDir;
+    }
+
+    // Strategy 4: Fallback to standard user home directory
+    const homeDirPinokio = path.join(os.homedir(), 'pinokio');
+    console.log(`[PTYController] Using standard home directory: ${homeDirPinokio}`);
+    return homeDirPinokio;
   }
 
   /**
    * Get augmented environment variables with Pinokio system paths
    * Ensures terminals can access Conda, Git, Node after they're installed
+   * Uses dynamically detected pinokioHome (not hardcoded to C: drive)
    * @param {Object} baseEnv - Base environment variables (defaults to process.env)
    * @returns {Object} Augmented environment with system paths
    */
   getAugmentedEnv(baseEnv = process.env) {
-    const path = require('path');
-    const fs = require('fs');
-    const homedir = os.homedir();
+    const platform = os.platform();
+    const binPath = path.join(this.pinokioHome, 'bin');
 
-    // Build system paths
-    const binPath = path.join(homedir, 'pinokio', 'bin');
-    const condaPath = path.join(binPath, 'miniconda');
-    const gitPath = path.join(binPath, 'git');
-    const nodePath = path.join(binPath, 'nodejs');
+    // Build comprehensive list of all possible binary paths
+    // CRITICAL: We add ALL conda subdirectories because conda needs them all
+    const pathsToAdd = [
+      binPath,
+      path.join(binPath, 'miniconda'),
+      path.join(binPath, 'miniconda', 'Scripts'),          // Windows conda executables
+      path.join(binPath, 'miniconda', 'Library', 'bin'),   // Windows conda DLLs
+      path.join(binPath, 'miniconda', 'bin'),              // Unix-style (also used in some Win installs)
+      path.join(binPath, 'miniconda', 'condabin'),         // Conda activation scripts
+      path.join(binPath, 'git', 'cmd'),                    // Windows git
+      path.join(binPath, 'git', 'bin'),                    // Unix git
+      path.join(binPath, 'nodejs'),                        // Node.js
+      path.join(binPath, 'node'),                          // Alternative node path
+      path.join(binPath, 'python')                         // Standalone python
+    ];
 
-    // Check which paths exist
-    const systemPaths = [];
+    // Filter only paths that actually exist to keep PATH clean
+    const validPaths = pathsToAdd.filter(p => fs.existsSync(p));
 
-    if (fs.existsSync(condaPath)) {
-      // Add conda binaries to PATH
-      if (os.platform() === 'win32') {
-        systemPaths.push(condaPath);
-        systemPaths.push(path.join(condaPath, 'Scripts'));
-        systemPaths.push(path.join(condaPath, 'Library', 'bin'));
-      } else {
-        systemPaths.push(path.join(condaPath, 'bin'));
-      }
-      console.log('[PTYController] Conda environment detected, adding to PATH');
+    if (validPaths.length > 0) {
+      console.log(`[PTYController] Found ${validPaths.length} system binary paths:`);
+      validPaths.forEach(p => console.log(`  - ${p}`));
+    } else {
+      console.warn(`[PTYController] No system binaries found in ${binPath}`);
+      console.warn('[PTYController] This is normal for first-run before environment installation');
     }
 
-    if (fs.existsSync(gitPath)) {
-      systemPaths.push(os.platform() === 'win32' ? path.join(gitPath, 'cmd') : path.join(gitPath, 'bin'));
-      console.log('[PTYController] Git environment detected, adding to PATH');
-    }
-
-    if (fs.existsSync(nodePath)) {
-      systemPaths.push(nodePath);
-      console.log('[PTYController] Node environment detected, adding to PATH');
-    }
-
-    // Augment PATH if we found system binaries
+    // Clone base environment
     const augmentedEnv = { ...baseEnv };
-    if (systemPaths.length > 0) {
-      const pathSeparator = os.platform() === 'win32' ? ';' : ':';
-      const currentPath = baseEnv.PATH || baseEnv.path || '';
-      augmentedEnv.PATH = systemPaths.join(pathSeparator) + pathSeparator + currentPath;
-      console.log('[PTYController] Augmented PATH with Pinokio system binaries');
+
+    // Handle Windows PATH case-insensitivity
+    // Windows can have Path, PATH, or path - we need to find the right one
+    const pathKey = platform === 'win32' ? 'Path' : 'PATH';
+    const existingPathKey = Object.keys(augmentedEnv).find(k => k.toUpperCase() === 'PATH') || pathKey;
+
+    // CRITICAL: Put our paths FIRST so conda/git/node are found before system versions
+    if (validPaths.length > 0) {
+      const existingPath = augmentedEnv[existingPathKey] || '';
+      augmentedEnv[existingPathKey] = validPaths.join(path.delimiter) + path.delimiter + existingPath;
+      console.log(`[PTYController] Injected ${validPaths.length} paths into ${existingPathKey}`);
     }
 
     return augmentedEnv;

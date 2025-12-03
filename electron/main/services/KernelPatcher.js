@@ -213,14 +213,19 @@ class KernelPatcher {
         // BYPASS: System Binaries & Installers
         // System files (Conda, Git, Node installers) must be handled natively by pinokiod
         // Installing them via GAS breaks the installation logic (symlinks/moves break .exe/.sh execution)
+        // Normalize path for cross-platform comparison (handles C:\, F:\, /home, etc.)
         const normalizedPath = targetPath.toLowerCase().replace(/\\/g, '/');
+
+        // Check if path contains system directories
+        // Works for: C:\Users\...\pinokio\bin, F:\pinokio\bin, /home/user/pinokio/bin, etc.
         const isSystemFile = normalizedPath.includes('/pinokio/bin/') ||
                             normalizedPath.includes('/pinokio/cache/') ||
-                            normalizedPath.includes('\\pinokio\\bin\\') ||
-                            normalizedPath.includes('\\pinokio\\cache\\');
+                            normalizedPath.includes('/.pinokio/bin/') ||
+                            normalizedPath.includes('/.pinokio/cache/');
 
         if (isSystemFile) {
           console.log(`[KernelPatcher] 🛡️  SYSTEM DOWNLOAD detected (${path.basename(targetPath)}). Bypassing GAS.`);
+          console.log(`[KernelPatcher] Path: ${targetPath}`);
           console.log('[KernelPatcher] Reason: System binaries must be installed natively by pinokiod.');
           self.fallbackCount++;
           return await self.originalDownload(req, ondata, kernel);
