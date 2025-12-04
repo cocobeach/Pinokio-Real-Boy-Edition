@@ -267,6 +267,18 @@ window.electronAPI = {
     remove: (params) => ipcRenderer.invoke('credentials:remove', params),
     list: () => ipcRenderer.invoke('credentials:list'),
   },
+
+  // Container APIs (BMAD Architecture - Epic 11.3: Container Engine Orchestrator)
+  container: {
+    launchProject: (params) => ipcRenderer.invoke('container:launch-project', params),
+    launchService: (params) => ipcRenderer.invoke('container:launch-service', params),
+    stop: (params) => ipcRenderer.invoke('container:stop', params),
+    restart: (params) => ipcRenderer.invoke('container:restart', params),
+    remove: (params) => ipcRenderer.invoke('container:remove', params),
+    status: (params) => ipcRenderer.invoke('container:status', params),
+    logs: (params) => ipcRenderer.invoke('container:logs', params),
+    list: () => ipcRenderer.invoke('container:list'),
+  },
 }
 
 ;(function initInspector() {

@@ -25,6 +25,7 @@ const MetricsService = require('../services/MetricsService'); // Epic 10.8: Inte
 const ProjectService = require('../services/ProjectService'); // Epic 11.1: The Service Orchestrator - Project Grouping
 const MultiServicePTYManager = require('../services/MultiServicePTYManager'); // Epic 11.2: Multi-Service Terminal UX
 const CredentialBrokerService = require('../services/CredentialBrokerService'); // Epic 11.8: Agentic Credential Broker
+const ContainerService = require('../services/ContainerService'); // Epic 11.3: Container Engine Orchestrator
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -405,6 +406,9 @@ class AppController {
     // Credential Broker Service handlers (Epic 11.8: Agentic Credential Broker)
     CredentialBrokerService.setupIpcHandlers(IpcRouter);
 
+    // Container Service handlers (Epic 11.3: Container Engine Orchestrator)
+    ContainerService.setupIpcHandlers(IpcRouter);
+
     // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
     IpcRouter.handle('window:minimize', async () => {
       const mainWindow = WindowManager.getMainWindow();
@@ -506,6 +510,7 @@ class AppController {
       ProjectService.destroy();  // Epic 11.1: Clean up project state
       MultiServicePTYManager.destroy();  // Epic 11.2: Close multi-service sessions
       await CredentialBrokerService.destroy();  // Epic 11.8: Save encrypted credentials
+      await ContainerService.destroy();  // Epic 11.3: Stop all containers and log streaming
       KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();
