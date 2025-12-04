@@ -202,6 +202,16 @@ window.electronAPI = {
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
   },
+
+  // Vector Memory APIs (BMAD Architecture - Epic 10.5: The Durable Mind)
+  vectorMemory: {
+    store: (params) => ipcRenderer.invoke('vector-memory:store', params),
+    search: (params) => ipcRenderer.invoke('vector-memory:search', params),
+    getContext: (params) => ipcRenderer.invoke('vector-memory:context', params),
+    delete: (params) => ipcRenderer.invoke('vector-memory:delete', params),
+    clearCategory: (params) => ipcRenderer.invoke('vector-memory:clear-category', params),
+    getStats: () => ipcRenderer.invoke('vector-memory:stats'),
+  },
 }
 
 ;(function initInspector() {

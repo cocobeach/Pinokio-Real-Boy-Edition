@@ -20,6 +20,7 @@ const GitService = require('../services/GitService'); // Epic 7: Agentic IDE - G
 const FileSystemService = require('../services/FileSystemService'); // Epic 7: Agentic IDE - Filesystem
 const HardwareService = require('../services/HardwareService'); // Epic 8: The Awakened Mind - Hardware Monitoring
 const PlanExecutor = require('../services/PlanExecutor'); // Epic 9: The Synergistic Forge - Plan Automation
+const VectorMemoryService = require('../services/VectorMemoryService'); // Epic 10.5: The Durable Mind - Vector Memory
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -79,6 +80,9 @@ class AppController {
 
       // Initialize AI Controller
       await AIController.initialize();
+
+      // Initialize Vector Memory Service (Epic 10.5)
+      await VectorMemoryService.initialize();
 
       // Setup IPC handlers
       this.setupIpcHandlers();
@@ -376,6 +380,9 @@ class AppController {
     // Plan Executor handlers (Epic 9: The Synergistic Forge)
     PlanExecutor.setupIpcHandlers(IpcRouter);
 
+    // Vector Memory Service handlers (Epic 10.5: The Durable Mind - Vector Memory)
+    VectorMemoryService.setupIpcHandlers(IpcRouter);
+
     // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
     IpcRouter.handle('window:minimize', async () => {
       const mainWindow = WindowManager.getMainWindow();
@@ -472,6 +479,7 @@ class AppController {
       ForgeService.destroy();
       InspectorService.destroy();
       await AIController.destroy();
+      await VectorMemoryService.destroy();  // Epic 10.5: Save vector memory
       KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();
