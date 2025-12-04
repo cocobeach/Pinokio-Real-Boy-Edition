@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - Epic 11: The Service Orchestrator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Monaco', 'Courier New', monospace;
+      background: #0a0e27;
+      color: #e0e0e0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1a1f3a 0%, #2d3561 100%);
+      padding: 20px 40px;
+      border-bottom: 2px solid rgba(102, 126, 234, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+
+    h1 {
+      font-size: 2rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: inline-block;
+    }
+
+    .subtitle {
+      color: #9ca3af;
+      margin-top: 5px;
+      font-size: 0.9rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 5px;
+      padding: 0 40px;
+      background: #0f1429;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      overflow-x: auto;
+    }
+
+    .tab {
+      padding: 15px 25px;
+      background: transparent;
+      border: none;
+      color: #9ca3af;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s;
+      white-space: nowrap;
+    }
+
+    .tab:hover {
+      color: #e0e0e0;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .tab.active {
+      color: #667eea;
+      border-bottom-color: #667eea;
+    }
+
+    .tab-content {
+      display: none;
+      padding: 30px 40px;
+      animation: fadeIn 0.3s;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      backdrop-filter: blur(10px);
+      transition: all 0.3s;
+    }
+
+    .card:hover {
+      border-color: rgba(102, 126, 234, 0.4);
+      box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
+    }
+
+    .card h2 {
+      font-size: 1.3rem;
+      margin-bottom: 15px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    .status-badge.running {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+    }
+
+    .status-badge.stopped {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+
+    .status-badge.idle {
+      background: rgba(156, 163, 175, 0.2);
+      color: #9ca3af;
+      border: 1px solid rgba(156, 163, 175, 0.4);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-right: 10px;
+      margin-top: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn.secondary {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn.danger {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    }
+
+    .btn.success {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .list-item {
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s;
+    }
+
+    .list-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(102, 126, 234, 0.4);
+    }
+
+    .list-item-title {
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .list-item-subtitle {
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: #cbd5e0;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #667eea;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .test-result {
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+    }
+
+    .test-result.passed {
+      background: rgba(16, 185, 129, 0.15);
+      border-left: 4px solid #10b981;
+    }
+
+    .test-result.failed {
+      background: rgba(239, 68, 68, 0.15);
+      border-left: 4px solid #ef4444;
+    }
+
+    .test-result-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .test-result-duration {
+      color: #9ca3af;
+      font-size: 0.8rem;
+    }
+
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .metric:last-child {
+      border-bottom: none;
+    }
+
+    .metric-label {
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+
+    .metric-value {
+      color: #fff;
+      font-weight: 600;
+      font-family: 'Courier New', monospace;
+    }
+
+    .console {
+      background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #0f0;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 15px;
+    }
+
+    .console-line {
+      margin-bottom: 4px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #9ca3af;
+    }
+
+    .empty-state-icon {
+      font-size: 3rem;
+      margin-bottom: 15px;
+      opacity: 0.5;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .badge.blue {
+      background: rgba(59, 130, 246, 0.2);
+      color: #3b82f6;
+    }
+
+    .badge.green {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+    }
+
+    .badge.yellow {
+      background: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(102, 126, 234, 0.5);
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(102, 126, 234, 0.7);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🚀 Epic 11 Admin Panel</h1>
+    <p class="subtitle">The Service Orchestrator - Multi-Repository Project Management</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('projects')">📁 Projects</button>
+    <button class="tab" onclick="switchTab('containers')">🐳 Containers</button>
+    <button class="tab" onclick="switchTab('services')">🔗 Services</button>
+    <button class="tab" onclick="switchTab('credentials')">🔐 Credentials</button>
+    <button class="tab" onclick="switchTab('testing')">🧪 Testing</button>
+    <button class="tab" onclick="switchTab('metrics')">📊 Metrics</button>
+    <button class="tab" onclick="switchTab('ai')">🤖 AI Config</button>
+  </div>
+
+  <!-- Projects Tab -->
+  <div id="tab-projects" class="tab-content active">
+    <div class="grid">
+      <div class="card">
+        <h2>Create New Project</h2>
+        <div class="form-group">
+          <label>Project Name</label>
+          <input type="text" id="new-project-name" placeholder="my-awesome-project">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" id="new-project-desc" placeholder="Multi-service application">
+        </div>
+        <div class="form-group">
+          <label>Root Path</label>
+          <input type="text" id="new-project-path" placeholder="/path/to/project">
+        </div>
+        <button class="btn success" onclick="createProject()">Create Project</button>
+      </div>
+
+      <div class="card">
+        <h2>All Projects <span class="badge blue" id="project-count">0</span></h2>
+        <div id="projects-list"></div>
+        <button class="btn secondary" onclick="refreshProjects()">Refresh</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Current Project</h2>
+      <div id="current-project-details"></div>
+    </div>
+  </div>
+
+  <!-- Containers Tab -->
+  <div id="tab-containers" class="tab-content">
+    <div class="grid">
+      <div class="card">
+        <h2>Launch Project Containers</h2>
+        <div class="form-group">
+          <label>Select Project</label>
+          <select id="container-project-select"></select>
+        </div>
+        <button class="btn success" onclick="launchProjectContainers()">Launch All Services</button>
+        <button class="btn secondary" onclick="stopAllContainers()">Stop All Services</button>
+      </div>
+
+      <div class="card">
+        <h2>Running Containers <span class="badge green" id="container-count">0</span></h2>
+        <div id="containers-list"></div>
+        <button class="btn secondary" onclick="refreshContainers()">Refresh</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Container Logs</h2>
+      <div class="console" id="container-logs">
+        <div class="console-line">[System] Waiting for container logs...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Services Tab (AppLinker) -->
+  <div id="tab-services" class="tab-content">
+    <div class="grid">
+      <div class="card">
+        <h2>Service Discovery</h2>
+        <div class="form-group">
+          <label>Select Project</label>
+          <select id="applinker-project-select"></select>
+        </div>
+        <button class="btn success" onclick="discoverServices()">Discover Services</button>
+        <button class="btn secondary" onclick="syncServices()">Sync Configuration</button>
+      </div>
+
+      <div class="card">
+        <h2>Discovered Services</h2>
+        <div id="discovered-services-list"></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Watch Mode</h2>
+        <div class="form-group">
+          <label>Select Project</label>
+          <select id="watch-project-select"></select>
+        </div>
+        <button class="btn success" onclick="startWatch()">Start Watch</button>
+        <button class="btn danger" onclick="stopWatch()">Stop Watch</button>
+        <div id="watch-status" style="margin-top: 15px;"></div>
+      </div>
+
+      <div class="card">
+        <h2>Multi-Service Terminal</h2>
+        <div class="form-group">
+          <label>Select Project</label>
+          <select id="pty-project-select"></select>
+        </div>
+        <button class="btn success" onclick="initMultiPTY()">Initialize Terminal</button>
+        <div id="pty-status" style="margin-top: 15px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Credentials Tab -->
+  <div id="tab-credentials" class="tab-content">
+    <div class="grid">
+      <div class="card">
+        <h2>Add Credential</h2>
+        <div class="form-group">
+          <label>Provider</label>
+          <select id="cred-provider">
+            <option value="github">GitHub</option>
+            <option value="gitlab">GitLab</option>
+            <option value="bitbucket">Bitbucket</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="cred-username" placeholder="username">
+        </div>
+        <div class="form-group">
+          <label>Token</label>
+          <input type="password" id="cred-token" placeholder="personal access token">
+        </div>
+        <button class="btn success" onclick="addCredential()">Add Credential</button>
+        <button class="btn secondary" onclick="startOAuth()">Start OAuth Flow</button>
+      </div>
+
+      <div class="card">
+        <h2>Stored Credentials <span class="badge blue" id="cred-count">0</span></h2>
+        <div id="credentials-list"></div>
+        <button class="btn secondary" onclick="refreshCredentials()">Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Testing Tab -->
+  <div id="tab-testing" class="tab-content">
+    <div class="grid">
+      <div class="card">
+        <h2>Test Suites</h2>
+        <div id="test-suites-list"></div>
+        <button class="btn success" onclick="runAllTests()">Run All Tests</button>
+        <button class="btn secondary" onclick="refreshTestSuites()">Refresh Suites</button>
+      </div>
+
+      <div class="card">
+        <h2>Test Results <span class="badge yellow" id="test-results-count">0</span></h2>
+        <div id="test-results-list"></div>
+        <button class="btn secondary" onclick="refreshTestResults()">Refresh</button>
+        <button class="btn danger" onclick="clearTestResults()">Clear Results</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Test Metrics</h2>
+      <div id="test-metrics"></div>
+    </div>
+  </div>
+
+  <!-- Metrics Tab -->
+  <div id="tab-metrics" class="tab-content">
+    <div class="grid">
+      <div class="card">
+        <h2>System Metrics</h2>
+        <div id="system-metrics"></div>
+        <button class="btn secondary" onclick="refreshMetrics()">Refresh</button>
+      </div>
+
+      <div class="card">
+        <h2>API Test Metrics</h2>
+        <div id="api-test-metrics"></div>
+      </div>
+
+      <div class="card">
+        <h2>Hardware Status</h2>
+        <div id="hardware-status"></div>
+        <button class="btn secondary" onclick="refreshHardware()">Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Config Tab (Legacy from Epic 8/9) -->
+  <div id="tab-ai" class="tab-content">
+    <div class="grid">
+      <div class="card">
+        <h2>AI Providers</h2>
+        <div class="metric">
+          <span class="metric-label">Ollama (Local)</span>
+          <span class="metric-value"><span class="status-badge running">Running</span></span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Claude Code CLI</span>
+          <span class="metric-value"><span class="status-badge idle">Idle</span></span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Gemini Code Assist</span>
+          <span class="metric-value"><span class="status-badge idle">Idle</span></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Hardware</h2>
+        <div id="ai-hardware-info"></div>
+        <button class="btn secondary" onclick="refreshHardware()">Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+      event.target.classList.add('active');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+
+      // Load data for the tab
+      loadTabData(tabName);
+    }
+
+    function loadTabData(tabName) {
+      switch (tabName) {
+        case 'projects':
+          refreshProjects();
+          break;
+        case 'containers':
+          refreshContainers();
+          populateProjectSelects();
+          break;
+        case 'services':
+          populateProjectSelects();
+          break;
+        case 'credentials':
+          refreshCredentials();
+          break;
+        case 'testing':
+          refreshTestSuites();
+          refreshTestResults();
+          break;
+        case 'metrics':
+          refreshMetrics();
+          refreshHardware();
+          break;
+        case 'ai':
+          refreshHardware();
+          break;
+      }
+    }
+
+    // Projects
+    async function refreshProjects() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.project.getAll();
+        const list = document.getElementById('projects-list');
+
+        if (result.success && result.projects.length > 0) {
+          list.innerHTML = result.projects.map(p => `
+            <div class="list-item">
+              <div>
+                <div class="list-item-title">${p.name}</div>
+                <div class="list-item-subtitle">${p.description || 'No description'}</div>
+              </div>
+              <button class="btn secondary" onclick="setCurrentProject('${p.name}')">Load</button>
+            </div>
+          `).join('');
+          document.getElementById('project-count').textContent = result.projects.length;
+        } else {
+          list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📁</div><p>No projects found</p></div>';
+        }
+
+        // Load current project
+        const current = await window.electronAPI.project.getCurrent();
+        if (current.success && current.project) {
+          displayCurrentProject(current.project);
+        }
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+      }
+    }
+
+    async function createProject() {
+      if (!window.electronAPI) return;
+
+      const name = document.getElementById('new-project-name').value;
+      const description = document.getElementById('new-project-desc').value;
+      const path = document.getElementById('new-project-path').value;
+
+      if (!name || !path) {
+        alert('Please fill in project name and path');
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.project.create({
+          name,
+          description,
+          rootPath: path
+        });
+
+        if (result.success) {
+          alert(`Project created: ${result.projectName}`);
+          refreshProjects();
+          document.getElementById('new-project-name').value = '';
+          document.getElementById('new-project-desc').value = '';
+          document.getElementById('new-project-path').value = '';
+        }
+      } catch (error) {
+        console.error('Failed to create project:', error);
+        alert('Failed to create project');
+      }
+    }
+
+    async function setCurrentProject(name) {
+      if (!window.electronAPI) return;
+
+      try {
+        await window.electronAPI.project.setCurrent({ projectName: name });
+        refreshProjects();
+      } catch (error) {
+        console.error('Failed to set current project:', error);
+      }
+    }
+
+    function displayCurrentProject(project) {
+      const details = document.getElementById('current-project-details');
+      details.innerHTML = `
+        <div class="list-item">
+          <div>
+            <div class="list-item-title">${project.name} <span class="badge green">CURRENT</span></div>
+            <div class="list-item-subtitle">${project.description || 'No description'}</div>
+            <div class="list-item-subtitle">Repositories: ${project.repositories?.length || 0}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Containers
+    async function refreshContainers() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.container.list();
+        const list = document.getElementById('containers-list');
+
+        if (result.success && result.containers.length > 0) {
+          list.innerHTML = result.containers.map(c => `
+            <div class="list-item">
+              <div>
+                <div class="list-item-title">${c.name}</div>
+                <div class="list-item-subtitle">${c.image} • ${c.status}</div>
+              </div>
+              <div>
+                <span class="status-badge ${c.running ? 'running' : 'stopped'}">
+                  <span class="status-dot"></span>
+                  ${c.running ? 'Running' : 'Stopped'}
+                </span>
+              </div>
+            </div>
+          `).join('');
+          document.getElementById('container-count').textContent = result.containers.filter(c => c.running).length;
+        } else {
+          list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🐳</div><p>No containers found</p></div>';
+        }
+      } catch (error) {
+        console.error('Failed to load containers:', error);
+      }
+    }
+
+    async function launchProjectContainers() {
+      if (!window.electronAPI) return;
+
+      const select = document.getElementById('container-project-select');
+      const projectName = select.value;
+
+      if (!projectName) {
+        alert('Please select a project');
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.container.launchProject({ projectName });
+        if (result.success) {
+          alert(`Launched containers for ${projectName}`);
+          refreshContainers();
+        }
+      } catch (error) {
+        console.error('Failed to launch containers:', error);
+        alert('Failed to launch containers');
+      }
+    }
+
+    // Services (AppLinker)
+    async function discoverServices() {
+      if (!window.electronAPI) return;
+
+      const select = document.getElementById('applinker-project-select');
+      const projectName = select.value;
+
+      if (!projectName) {
+        alert('Please select a project');
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.appLinker.discover({ projectName });
+        const list = document.getElementById('discovered-services-list');
+
+        if (result.success && result.discovered) {
+          const services = Object.values(result.discovered);
+          list.innerHTML = services.map(s => `
+            <div class="list-item">
+              <div>
+                <div class="list-item-title">${s.serviceName}</div>
+                <div class="list-item-subtitle">Ports: ${JSON.stringify(s.ports || {})}</div>
+              </div>
+              <span class="status-badge ${s.running ? 'running' : 'stopped'}">
+                ${s.running ? 'Running' : 'Stopped'}
+              </span>
+            </div>
+          `).join('');
+        } else {
+          list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><p>No services discovered</p></div>';
+        }
+      } catch (error) {
+        console.error('Failed to discover services:', error);
+      }
+    }
+
+    async function syncServices() {
+      if (!window.electronAPI) return;
+
+      const select = document.getElementById('applinker-project-select');
+      const projectName = select.value;
+
+      if (!projectName) {
+        alert('Please select a project');
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.appLinker.sync({ projectName });
+        if (result.success) {
+          alert('Configuration synced successfully');
+        }
+      } catch (error) {
+        console.error('Failed to sync services:', error);
+        alert('Failed to sync configuration');
+      }
+    }
+
+    async function startWatch() {
+      if (!window.electronAPI) return;
+
+      const select = document.getElementById('watch-project-select');
+      const projectName = select.value;
+
+      if (!projectName) {
+        alert('Please select a project');
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.appLinker.watchStart({ projectName });
+        if (result.success) {
+          document.getElementById('watch-status').innerHTML = `<div class="status-badge running">Watch Active</div>`;
+        }
+      } catch (error) {
+        console.error('Failed to start watch:', error);
+      }
+    }
+
+    async function stopWatch() {
+      if (!window.electronAPI) return;
+
+      const select = document.getElementById('watch-project-select');
+      const projectName = select.value;
+
+      if (!projectName) {
+        alert('Please select a project');
+        return;
+      }
+
+      try {
+        await window.electronAPI.appLinker.watchStop({ projectName });
+        document.getElementById('watch-status').innerHTML = `<div class="status-badge stopped">Watch Stopped</div>`;
+      } catch (error) {
+        console.error('Failed to stop watch:', error);
+      }
+    }
+
+    // Credentials
+    async function refreshCredentials() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.credentials.list();
+        const list = document.getElementById('credentials-list');
+
+        if (result.success && result.credentials.length > 0) {
+          list.innerHTML = result.credentials.map(c => `
+            <div class="list-item">
+              <div>
+                <div class="list-item-title">${c.provider}</div>
+                <div class="list-item-subtitle">${c.username}</div>
+              </div>
+              <button class="btn danger" onclick="removeCredential('${c.provider}')">Remove</button>
+            </div>
+          `).join('');
+          document.getElementById('cred-count').textContent = result.credentials.length;
+        } else {
+          list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔐</div><p>No credentials stored</p></div>';
+        }
+      } catch (error) {
+        console.error('Failed to load credentials:', error);
+      }
+    }
+
+    async function addCredential() {
+      if (!window.electronAPI) return;
+
+      const provider = document.getElementById('cred-provider').value;
+      const username = document.getElementById('cred-username').value;
+      const token = document.getElementById('cred-token').value;
+
+      if (!username || !token) {
+        alert('Please fill in username and token');
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.credentials.add({
+          provider,
+          username,
+          token,
+          type: 'token'
+        });
+
+        if (result.success) {
+          alert(`Credential added for ${provider}`);
+          refreshCredentials();
+          document.getElementById('cred-username').value = '';
+          document.getElementById('cred-token').value = '';
+        }
+      } catch (error) {
+        console.error('Failed to add credential:', error);
+        alert('Failed to add credential');
+      }
+    }
+
+    async function removeCredential(provider) {
+      if (!window.electronAPI) return;
+
+      if (!confirm(`Remove credential for ${provider}?`)) {
+        return;
+      }
+
+      try {
+        await window.electronAPI.credentials.remove({ provider });
+        refreshCredentials();
+      } catch (error) {
+        console.error('Failed to remove credential:', error);
+      }
+    }
+
+    async function startOAuth() {
+      if (!window.electronAPI) return;
+
+      const provider = document.getElementById('cred-provider').value;
+
+      try {
+        const result = await window.electronAPI.credentials.startOAuth({ provider });
+        if (result.success) {
+          alert('OAuth flow started - complete authentication in browser');
+        }
+      } catch (error) {
+        console.error('Failed to start OAuth:', error);
+        alert('Failed to start OAuth flow');
+      }
+    }
+
+    // Testing
+    async function refreshTestSuites() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.apiTest.listSuites();
+        const list = document.getElementById('test-suites-list');
+
+        if (result.success && result.suites.length > 0) {
+          list.innerHTML = result.suites.map(s => `
+            <div class="list-item">
+              <div>
+                <div class="list-item-title">${s.name} <span class="badge blue">${s.testCount} tests</span></div>
+                <div class="list-item-subtitle">${s.description}</div>
+              </div>
+              <button class="btn success" onclick="runTestSuite('${s.name}')">Run</button>
+            </div>
+          `).join('');
+        } else {
+          list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🧪</div><p>No test suites found</p></div>';
+        }
+      } catch (error) {
+        console.error('Failed to load test suites:', error);
+      }
+    }
+
+    async function runTestSuite(suiteName) {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.apiTest.runSuite({
+          suiteName,
+          context: {}
+        });
+
+        if (result.success) {
+          alert(`Suite completed: ${result.summary.passed}/${result.summary.total} tests passed`);
+          refreshTestResults();
+        }
+      } catch (error) {
+        console.error('Failed to run test suite:', error);
+        alert('Failed to run test suite');
+      }
+    }
+
+    async function runAllTests() {
+      if (!window.electronAPI) return;
+
+      if (!confirm('Run all test suites? This may take several minutes.')) {
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.apiTest.runAll({ context: {} });
+
+        if (result.success) {
+          alert(`All tests completed: ${result.summary.passed}/${result.summary.total} tests passed`);
+          refreshTestResults();
+        }
+      } catch (error) {
+        console.error('Failed to run all tests:', error);
+        alert('Failed to run tests');
+      }
+    }
+
+    async function refreshTestResults() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.apiTest.getResults({ limit: 20 });
+        const list = document.getElementById('test-results-list');
+
+        if (result.success && result.results.length > 0) {
+          list.innerHTML = result.results.map(r => `
+            <div class="test-result ${r.passed ? 'passed' : 'failed'}">
+              <span class="test-result-name">${r.testName}</span>
+              <span class="test-result-duration">${r.duration}ms</span>
+            </div>
+          `).join('');
+          document.getElementById('test-results-count').textContent = result.results.length;
+
+          // Display test metrics
+          const metricsDiv = document.getElementById('test-metrics');
+          metricsDiv.innerHTML = `
+            <div class="metric">
+              <span class="metric-label">Total Tests</span>
+              <span class="metric-value">${result.metrics.tests_total}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Passed</span>
+              <span class="metric-value" style="color: #10b981;">${result.metrics.tests_passed}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Failed</span>
+              <span class="metric-value" style="color: #ef4444;">${result.metrics.tests_failed}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Total Duration</span>
+              <span class="metric-value">${result.metrics.total_duration_ms}ms</span>
+            </div>
+          `;
+        } else {
+          list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><p>No test results</p></div>';
+        }
+      } catch (error) {
+        console.error('Failed to load test results:', error);
+      }
+    }
+
+    async function clearTestResults() {
+      if (!window.electronAPI) return;
+
+      if (!confirm('Clear all test results?')) {
+        return;
+      }
+
+      try {
+        await window.electronAPI.apiTest.clearResults();
+        refreshTestResults();
+      } catch (error) {
+        console.error('Failed to clear test results:', error);
+      }
+    }
+
+    // Metrics
+    async function refreshMetrics() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.metrics.get();
+        const metricsDiv = document.getElementById('system-metrics');
+
+        if (result.success) {
+          metricsDiv.innerHTML = Object.entries(result.metrics)
+            .filter(([key]) => key !== 'start_time')
+            .map(([key, value]) => `
+              <div class="metric">
+                <span class="metric-label">${key.replace(/_/g, ' ')}</span>
+                <span class="metric-value">${value}</span>
+              </div>
+            `).join('');
+        }
+
+        // Get API test metrics
+        const apiTestResult = await window.electronAPI.apiTest.getMetrics();
+        const apiMetricsDiv = document.getElementById('api-test-metrics');
+
+        if (apiTestResult.success) {
+          apiMetricsDiv.innerHTML = Object.entries(apiTestResult.metrics)
+            .map(([key, value]) => `
+              <div class="metric">
+                <span class="metric-label">${key.replace(/_/g, ' ')}</span>
+                <span class="metric-value">${value}</span>
+              </div>
+            `).join('');
+        }
+      } catch (error) {
+        console.error('Failed to load metrics:', error);
+      }
+    }
+
+    async function refreshHardware() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.hardware.getSummary();
+        const hwDiv = document.getElementById('hardware-status') || document.getElementById('ai-hardware-info');
+
+        if (result.success && hwDiv) {
+          hwDiv.innerHTML = `
+            <div class="metric">
+              <span class="metric-label">GPU</span>
+              <span class="metric-value">${result.gpu?.name || 'No GPU'}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">VRAM</span>
+              <span class="metric-value">${result.gpu?.vram || 'N/A'}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">CPU</span>
+              <span class="metric-value">${result.cpu?.model || 'Unknown'}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">RAM</span>
+              <span class="metric-value">${result.memory?.total || 'N/A'}</span>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Failed to load hardware:', error);
+      }
+    }
+
+    // Helper: Populate project selects
+    async function populateProjectSelects() {
+      if (!window.electronAPI) return;
+
+      try {
+        const result = await window.electronAPI.project.getAll();
+
+        if (result.success && result.projects.length > 0) {
+          const options = result.projects.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+
+          document.getElementById('container-project-select').innerHTML = '<option value="">Select Project</option>' + options;
+          document.getElementById('applinker-project-select').innerHTML = '<option value="">Select Project</option>' + options;
+          document.getElementById('watch-project-select').innerHTML = '<option value="">Select Project</option>' + options;
+          document.getElementById('pty-project-select').innerHTML = '<option value="">Select Project</option>' + options;
+        }
+      } catch (error) {
+        console.error('Failed to populate project selects:', error);
+      }
+    }
+
+    async function initMultiPTY() {
+      if (!window.electronAPI) return;
+
+      const select = document.getElementById('pty-project-select');
+      const projectName = select.value;
+
+      if (!projectName) {
+        alert('Please select a project');
+        return;
+      }
+
+      try {
+        const result = await window.electronAPI.multiServicePTY.initProject({
+          projectName,
+          ptyController: null
+        });
+
+        if (result.success || result.projectName) {
+          document.getElementById('pty-status').innerHTML = `
+            <div class="status-badge running">Terminal Initialized</div>
+            <div class="list-item-subtitle">Services: ${result.services?.length || 0}</div>
+          `;
+        }
+      } catch (error) {
+        console.error('Failed to initialize multi-PTY:', error);
+        alert('Failed to initialize terminal');
+      }
+    }
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('[Admin Panel] Epic 11 Admin Panel loaded');
+      loadTabData('projects');
+    });
+  </script>
+</body>
+</html>
