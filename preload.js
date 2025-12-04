@@ -256,6 +256,17 @@ window.electronAPI = {
     onLog: (callback) => ipcRenderer.on('multi-pty:log', (event, data) => callback(data)),
     onTabSwitch: (callback) => ipcRenderer.on('multi-pty:tab-switch', (event, data) => callback(data)),
   },
+
+  // Credential Broker APIs (BMAD Architecture - Epic 11.8: Agentic Credential Broker)
+  credentials: {
+    startOAuth: (params) => ipcRenderer.invoke('credentials:start-oauth', params),
+    oauthCallback: (params) => ipcRenderer.invoke('credentials:oauth-callback', params),
+    add: (params) => ipcRenderer.invoke('credentials:add', params),
+    get: (params) => ipcRenderer.invoke('credentials:get', params),
+    getAgentEnv: (params) => ipcRenderer.invoke('credentials:get-agent-env', params),
+    remove: (params) => ipcRenderer.invoke('credentials:remove', params),
+    list: () => ipcRenderer.invoke('credentials:list'),
+  },
 }
 
 ;(function initInspector() {

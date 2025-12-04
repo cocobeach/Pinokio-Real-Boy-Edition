@@ -24,6 +24,7 @@ const VectorMemoryService = require('../services/VectorMemoryService'); // Epic 
 const MetricsService = require('../services/MetricsService'); // Epic 10.8: Integration Testing & Metrics
 const ProjectService = require('../services/ProjectService'); // Epic 11.1: The Service Orchestrator - Project Grouping
 const MultiServicePTYManager = require('../services/MultiServicePTYManager'); // Epic 11.2: Multi-Service Terminal UX
+const CredentialBrokerService = require('../services/CredentialBrokerService'); // Epic 11.8: Agentic Credential Broker
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -89,6 +90,9 @@ class AppController {
 
       // Initialize Metrics Service (Epic 10.8)
       await MetricsService.initialize(9090); // Prometheus on port 9090
+
+      // Initialize Credential Broker Service (Epic 11.8)
+      await CredentialBrokerService.initialize();
 
       // Setup IPC handlers
       this.setupIpcHandlers();
@@ -398,6 +402,9 @@ class AppController {
     // Multi-Service PTY Manager handlers (Epic 11.2: Multi-Service Terminal UX)
     MultiServicePTYManager.setupIpcHandlers(IpcRouter);
 
+    // Credential Broker Service handlers (Epic 11.8: Agentic Credential Broker)
+    CredentialBrokerService.setupIpcHandlers(IpcRouter);
+
     // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
     IpcRouter.handle('window:minimize', async () => {
       const mainWindow = WindowManager.getMainWindow();
@@ -498,6 +505,7 @@ class AppController {
       await MetricsService.destroy();  // Epic 10.8: Close metrics server
       ProjectService.destroy();  // Epic 11.1: Clean up project state
       MultiServicePTYManager.destroy();  // Epic 11.2: Close multi-service sessions
+      await CredentialBrokerService.destroy();  // Epic 11.8: Save encrypted credentials
       KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();
