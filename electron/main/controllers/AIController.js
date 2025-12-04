@@ -14,12 +14,20 @@ const execAsync = promisify(exec);
 
 class AIController {
   constructor() {
-    // Ollama (local AI)
+    // Epic 10.4: Dual-Channel Ollama (bundled + external)
     this.ollama = null;
     this.isRunning = false;
     this.ollamaPath = null;
-    this.port = 11435;
+    this.bundledPort = 11435;  // Bundled Ollama (shipped with app)
+    this.externalPort = 11434;  // External Ollama (user-installed)
+    this.port = this.bundledPort;  // Default to bundled
     this.initialized = false;
+
+    // Epic 10.4: Dual-Channel configuration
+    this.ollamaChannels = {
+      external: { available: false, port: this.externalPort, priority: 1 },  // Higher priority
+      bundled: { available: false, port: this.bundledPort, priority: 2 }    // Fallback
+    };
 
     // Multi-provider configuration
     this.providers = {
@@ -80,32 +88,83 @@ class AIController {
   }
 
   /**
-   * Initialize Ollama (legacy support)
+   * Epic 10.4: Detect external Ollama instance
+   * @param {number} port - Port to check
+   * @returns {Promise<boolean>} True if Ollama is running on this port
+   */
+  async detectOllamaInstance(port) {
+    try {
+      const response = await fetch(`http://localhost:${port}/api/tags`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000)  // 2 second timeout
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log(`[AIController] Ollama detected on port ${port} with ${data.models?.length || 0} models`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Initialize Ollama with dual-channel support
+   * Epic 10.4: Detects external (11434) and bundled (11435) instances
    */
   async initializeOllama(options = {}) {
     try {
-      if (options.port) {
-        this.port = options.port;
-      }
-
       const homedir = os.homedir();
       const binPath = options.binPath || path.join(homedir, 'pinokio', 'bin');
       this.ollamaPath = path.join(binPath, os.platform() === 'win32' ? 'ollama.exe' : 'ollama');
 
       console.log(`[AIController] Ollama binary path: ${this.ollamaPath}`);
 
-      const exists = fs.existsSync(this.ollamaPath);
-      if (!exists) {
-        console.warn('[AIController] Ollama binary not found.');
-        return { success: false, reason: 'binary_not_found' };
+      // Epic 10.4: Detect both external and bundled Ollama
+      console.log('[AIController] Detecting Ollama channels...');
+
+      const externalAvailable = await this.detectOllamaInstance(this.externalPort);
+      const bundledAvailable = await this.detectOllamaInstance(this.bundledPort);
+
+      this.ollamaChannels.external.available = externalAvailable;
+      this.ollamaChannels.bundled.available = bundledAvailable;
+
+      if (externalAvailable) {
+        console.log(`[AIController] ✓ External Ollama detected on port ${this.externalPort} (priority 1)`);
+        this.port = this.externalPort;  // Prioritize external
+        this.isRunning = true;
+      } else if (bundledAvailable) {
+        console.log(`[AIController] ✓ Bundled Ollama detected on port ${this.bundledPort} (priority 2)`);
+        this.port = this.bundledPort;  // Fallback to bundled
+        this.isRunning = true;
+      } else {
+        console.warn('[AIController] No Ollama instances detected (ports 11434, 11435)');
+
+        // Check if bundled binary exists for future startup
+        const exists = fs.existsSync(this.ollamaPath);
+        if (!exists) {
+          console.warn('[AIController] Bundled Ollama binary not found.');
+          return { success: false, reason: 'no_ollama_available' };
+        }
       }
 
-      const { Ollama } = require('electron-ollama');
-      this.ollama = new Ollama();
-      this.providers.ollama.available = true;
+      // Mark provider as available if any channel is available
+      if (externalAvailable || bundledAvailable) {
+        const { Ollama } = require('electron-ollama');
+        this.ollama = new Ollama();
+        this.providers.ollama.available = true;
+        console.log('[AIController] Ollama dual-channel initialized');
+      }
 
-      console.log('[AIController] Ollama initialized');
-      return { success: true };
+      return {
+        success: true,
+        channels: {
+          external: this.ollamaChannels.external,
+          bundled: this.ollamaChannels.bundled
+        }
+      };
 
     } catch (error) {
       console.error('[AIController] Ollama initialization failed:', error);
@@ -280,18 +339,49 @@ class AIController {
   }
 
   /**
-   * Query Ollama directly
+   * Epic 10.4: Select best available Ollama channel
+   * @returns {Object|null} Selected channel or null if none available
+   */
+  selectOllamaChannel() {
+    // Priority: external (user's high-performance) > bundled (convenience)
+    if (this.ollamaChannels.external.available) {
+      return { name: 'external', ...this.ollamaChannels.external };
+    } else if (this.ollamaChannels.bundled.available) {
+      return { name: 'bundled', ...this.ollamaChannels.bundled };
+    }
+    return null;
+  }
+
+  /**
+   * Query Ollama with dual-channel support
+   * Epic 10.4: Routes to external or bundled instance
    * @param {string} prompt - The prompt
    * @param {string} model - Model to use
+   * @param {Object} options - Query options
+   * @param {string} options.channel - Force specific channel ('external' or 'bundled')
    * @returns {Promise<Object>} Response
    */
-  async queryOllama(prompt, model = 'llama2') {
-    if (!this.isRunning) {
-      return { success: false, reason: 'ollama_not_running' };
+  async queryOllama(prompt, model = 'llama2', options = {}) {
+    // Epic 10.4: Channel selection with fallback
+    let channel = null;
+
+    if (options.channel && this.ollamaChannels[options.channel]?.available) {
+      // Use specified channel if available
+      channel = { name: options.channel, ...this.ollamaChannels[options.channel] };
+    } else {
+      // Auto-select best channel
+      channel = this.selectOllamaChannel();
+    }
+
+    if (!channel) {
+      console.warn('[AIController] No Ollama channels available');
+      return { success: false, reason: 'no_ollama_channels' };
     }
 
     try {
-      const response = await fetch(`http://localhost:${this.port}/api/generate`, {
+      console.log(`[AIController] Querying Ollama (${channel.name} on port ${channel.port})`);
+
+      const response = await fetch(`http://localhost:${channel.port}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -302,6 +392,11 @@ class AIController {
       });
 
       if (!response.ok) {
+        // Epic 10.4: Try fallback channel if primary fails
+        if (channel.name === 'external' && this.ollamaChannels.bundled.available) {
+          console.warn('[AIController] External Ollama failed, falling back to bundled');
+          return await this.queryOllama(prompt, model, { channel: 'bundled' });
+        }
         throw new Error(`Ollama API error: ${response.status}`);
       }
 
@@ -310,13 +405,56 @@ class AIController {
         success: true,
         response: data.response,
         model: data.model,
-        provider: 'ollama'
+        provider: 'ollama',
+        channel: channel.name  // Epic 10.4: Report which channel was used
       };
 
     } catch (error) {
-      console.error('[AIController] Ollama query error:', error);
-      return { success: false, error: error.message };
+      console.error(`[AIController] Ollama (${channel.name}) query error:`, error);
+
+      // Epic 10.4: Fallback logic
+      if (channel.name === 'external' && this.ollamaChannels.bundled.available) {
+        console.warn('[AIController] Retrying with bundled Ollama');
+        return await this.queryOllama(prompt, model, { channel: 'bundled' });
+      }
+
+      return { success: false, error: error.message, channel: channel.name };
     }
+  }
+
+  /**
+   * Epic 10.4: Query both Ollama channels in parallel (for acceleration)
+   * Returns the fastest response, useful for heavy workloads
+   * @param {string} prompt - The prompt
+   * @param {string} model - Model to use
+   * @returns {Promise<Object>} Fastest response
+   */
+  async queryOllamaParallel(prompt, model = 'llama2') {
+    const availableChannels = [];
+
+    if (this.ollamaChannels.external.available) {
+      availableChannels.push(
+        this.queryOllama(prompt, model, { channel: 'external' })
+      );
+    }
+
+    if (this.ollamaChannels.bundled.available) {
+      availableChannels.push(
+        this.queryOllama(prompt, model, { channel: 'bundled' })
+      );
+    }
+
+    if (availableChannels.length === 0) {
+      return { success: false, reason: 'no_ollama_channels' };
+    }
+
+    console.log(`[AIController] Racing ${availableChannels.length} Ollama channel(s)...`);
+
+    // Race to get the fastest response
+    const result = await Promise.race(availableChannels);
+    console.log(`[AIController] Winner: ${result.channel || 'unknown'} channel`);
+
+    return result;
   }
 
   /**
