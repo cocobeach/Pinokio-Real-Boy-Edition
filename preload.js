@@ -279,6 +279,15 @@ window.electronAPI = {
     logs: (params) => ipcRenderer.invoke('container:logs', params),
     list: () => ipcRenderer.invoke('container:list'),
   },
+
+  // AppLinker APIs (BMAD Architecture - Epic 11.4: Dynamic Config Sync)
+  appLinker: {
+    discover: (params) => ipcRenderer.invoke('applinker:discover', params),
+    sync: (params) => ipcRenderer.invoke('applinker:sync', params),
+    watchStart: (params) => ipcRenderer.invoke('applinker:watch-start', params),
+    watchStop: (params) => ipcRenderer.invoke('applinker:watch-stop', params),
+    watchStatus: (params) => ipcRenderer.invoke('applinker:watch-status', params),
+  },
 }
 
 ;(function initInspector() {
