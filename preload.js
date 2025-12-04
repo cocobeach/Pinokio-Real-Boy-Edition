@@ -103,13 +103,16 @@ window.electronAPI = {
     getProviders: () => ipcRenderer.invoke('ai:get-providers'),
   },
 
-  // Hardware APIs (Epic 8: The Awakened Mind)
+  // Hardware APIs (Epic 8: The Awakened Mind + Epic 10.7: VRAM Optimization)
   hardware: {
     getGPU: (params) => ipcRenderer.invoke('hardware:gpu', params),
     getCPU: () => ipcRenderer.invoke('hardware:cpu'),
     getSystem: () => ipcRenderer.invoke('hardware:system'),
     checkCompatibility: (params) => ipcRenderer.invoke('hardware:check-compatibility', params),
     getSummary: () => ipcRenderer.invoke('hardware:summary'),
+    // Epic 10.7: VRAM optimization
+    calculateVRAM: (params) => ipcRenderer.invoke('hardware:calculate-vram', params),
+    getOptimizedEnv: (params) => ipcRenderer.invoke('hardware:optimized-env', params),
   },
 
   // Config APIs (Epic 8: Configuration Management)

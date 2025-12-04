@@ -436,6 +436,162 @@ class HardwareService {
   }
 
   /**
+   * Epic 10.7: Calculate optimal VRAM allocation for AI models
+   * @param {Object} options - Optimization options
+   * @param {number} options.modelSizeGB - Estimated model size in GB
+   * @param {number} options.safetyMargin - Safety margin (default: 0.8 = 80%)
+   * @returns {Promise<Object>} VRAM allocation recommendations
+   */
+  async calculateVRAMAllocation(options = {}) {
+    const { modelSizeGB = 7, safetyMargin = 0.8 } = options;
+
+    try {
+      const gpuInfo = await this.getGPUInfo();
+
+      if (!gpuInfo.hasGPU) {
+        return {
+          success: true,
+          useCPU: true,
+          reason: 'No GPU available',
+          recommendation: 'cpu_only'
+        };
+      }
+
+      // Calculate available VRAM per GPU
+      const gpuAllocations = gpuInfo.gpus.map((gpu, index) => {
+        const totalVRAM = gpu.memory.total; // MiB
+        const usedVRAM = gpu.memory.used;
+        const freeVRAM = gpu.memory.free;
+
+        // Apply safety margin to avoid OOM
+        const safeAvailable = freeVRAM * safetyMargin;
+        const safeAvailableGB = safeAvailable / 1024;
+
+        const canFitModel = safeAvailableGB >= modelSizeGB;
+
+        return {
+          gpuId: index,
+          name: gpu.name,
+          totalVRAM,
+          usedVRAM,
+          freeVRAM,
+          safeAvailableGB,
+          canFitModel,
+          recommendedAllocation: canFitModel ? Math.floor(safeAvailable) : 0
+        };
+      });
+
+      // Find best GPU
+      const bestGPU = gpuAllocations
+        .filter(g => g.canFitModel)
+        .sort((a, b) => b.safeAvailableGB - a.safeAvailableGB)[0];
+
+      if (bestGPU) {
+        return {
+          success: true,
+          useCPU: false,
+          useGPU: true,
+          selectedGPU: bestGPU.gpuId,
+          allocatedVRAM: bestGPU.recommendedAllocation,
+          recommendation: 'gpu',
+          gpuAllocations
+        };
+      } else {
+        // No GPU can fit the model
+        const totalFreeVRAM = gpuAllocations.reduce((sum, g) => sum + g.freeVRAM, 0) / 1024;
+
+        return {
+          success: true,
+          useCPU: true,
+          useGPU: false,
+          reason: `Model size (${modelSizeGB}GB) exceeds available VRAM (${totalFreeVRAM.toFixed(1)}GB)`,
+          recommendation: 'cpu_fallback',
+          gpuAllocations
+        };
+      }
+
+    } catch (error) {
+      console.error('[HardwareService] Error calculating VRAM allocation:', error);
+      return {
+        success: false,
+        error: error.message,
+        useCPU: true,
+        recommendation: 'cpu_fallback'
+      };
+    }
+  }
+
+  /**
+   * Epic 10.7: Generate PyTorch CUDA environment variables
+   * @param {Object} allocation - VRAM allocation from calculateVRAMAllocation
+   * @returns {Object} Environment variables to set
+   */
+  generatePyTorchEnv(allocation) {
+    const env = {};
+
+    if (allocation.useCPU) {
+      // CPU-only mode
+      env.CUDA_VISIBLE_DEVICES = '-1';
+      console.log('[HardwareService] Forcing CPU-only mode (no GPU available or insufficient VRAM)');
+    } else if (allocation.useGPU) {
+      // GPU mode with optimization
+      env.CUDA_VISIBLE_DEVICES = allocation.selectedGPU.toString();
+
+      // PyTorch CUDA allocator config for better memory management
+      // - max_split_size_mb: Prevents fragmentation by limiting split size
+      // - garbage_collection_threshold: More aggressive GC to free memory
+      const maxSplitSize = Math.floor(allocation.allocatedVRAM / 4); // 1/4 of available VRAM
+      env.PYTORCH_CUDA_ALLOC_CONF = `max_split_size_mb:${maxSplitSize},garbage_collection_threshold:0.6`;
+
+      console.log(`[HardwareService] Optimized for GPU ${allocation.selectedGPU}`);
+      console.log(`[HardwareService] PYTORCH_CUDA_ALLOC_CONF=${env.PYTORCH_CUDA_ALLOC_CONF}`);
+    }
+
+    return env;
+  }
+
+  /**
+   * Epic 10.7: Get optimized environment for AI model execution
+   * @param {Object} options - Model options
+   * @param {number} options.modelSizeGB - Model size in GB
+   * @param {Object} options.baseEnv - Base environment variables
+   * @returns {Promise<Object>} Optimized environment with CUDA settings
+   */
+  async getOptimizedEnv(options = {}) {
+    const { modelSizeGB = 7, baseEnv = process.env } = options;
+
+    try {
+      // Calculate VRAM allocation
+      const allocation = await this.calculateVRAMAllocation({ modelSizeGB });
+
+      // Generate PyTorch environment variables
+      const pytorchEnv = this.generatePyTorchEnv(allocation);
+
+      // Merge with base environment
+      const optimizedEnv = {
+        ...baseEnv,
+        ...pytorchEnv
+      };
+
+      return {
+        success: true,
+        env: optimizedEnv,
+        allocation,
+        recommendation: allocation.recommendation
+      };
+
+    } catch (error) {
+      console.error('[HardwareService] Error generating optimized environment:', error);
+      return {
+        success: false,
+        error: error.message,
+        env: baseEnv,
+        recommendation: 'cpu_fallback'
+      };
+    }
+  }
+
+  /**
    * Setup IPC handlers
    * @param {IpcRouter} ipcRouter - IPC router instance
    */
@@ -467,6 +623,15 @@ class HardwareService {
     ipcRouter.handle('hardware:summary', async () => {
       const summary = await this.getHardwareSummary();
       return { success: true, summary };
+    });
+
+    // Epic 10.7: VRAM optimization
+    ipcRouter.handle('hardware:calculate-vram', async (event, params) => {
+      return await this.calculateVRAMAllocation(params || {});
+    });
+
+    ipcRouter.handle('hardware:optimized-env', async (event, params) => {
+      return await this.getOptimizedEnv(params || {});
     });
 
     console.log('[HardwareService] IPC handlers registered');
