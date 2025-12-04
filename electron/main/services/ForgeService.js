@@ -68,9 +68,9 @@ class ForgeService {
       }
 
       // === PASS 2: THE AUDITOR (Security Review) ===
-      onProgress?.({ stage: 'auditing', message: 'AI Security Auditor is reviewing commands...' });
+      onProgress?.({ stage: 'auditing', message: 'AI Security Auditor is reviewing commands...', progress: 0 });
 
-      const auditResult = await this.securityAudit(manifest, model);
+      const auditResult = await this.securityAudit(manifest, model, onProgress);
 
       if (!auditResult.safe) {
         throw new Error(`Security Blocked: ${auditResult.reason}. Flagged: ${auditResult.flaggedCommands.join(', ')}`);
@@ -232,12 +232,17 @@ Generate the manifest now:`;
   /**
    * Phase 6: Security Audit using AI (Intent-Based Analysis)
    * Uses a second AI pass to analyze commands for malicious intent
+   * Epic 10.3: Enhanced with progress reporting
    * @param {InstallManifest} manifest - The manifest to audit
    * @param {string} model - LLM model to use (optional)
+   * @param {Function} onProgress - Progress callback (Epic 10.3)
    * @returns {Promise<Object>} Audit result { safe, riskLevel, reason, flaggedCommands }
    */
-  async securityAudit(manifest, model) {
+  async securityAudit(manifest, model, onProgress) {
     try {
+      // Epic 10.3: Report audit start
+      onProgress?.({ stage: 'auditing', message: 'Analyzing command safety...', progress: 10 });
+
       // Build list of all commands to audit
       const commandsToAudit = [
         ...manifest.installCommands,
@@ -246,6 +251,7 @@ Generate the manifest now:`;
 
       if (commandsToAudit.length === 0) {
         // No commands to audit - safe by default
+        onProgress?.({ stage: 'auditing', message: 'No commands to audit - safe', progress: 100 });
         return {
           safe: true,
           riskLevel: 'low',
@@ -253,6 +259,13 @@ Generate the manifest now:`;
           flaggedCommands: []
         };
       }
+
+      // Epic 10.3: Report command counting
+      onProgress?.({
+        stage: 'auditing',
+        message: `Scanning ${commandsToAudit.length} command(s) for risks...`,
+        progress: 25
+      });
 
       // Build the security audit prompt
       const auditPrompt = `You are the Pinokio AI Security Auditor, an expert at identifying malicious intent in shell commands.
@@ -332,12 +345,26 @@ Response: {"safe": false, "riskLevel": "high", "reason": "Attempting to delete s
 
 Analyze the commands above and respond with JSON:`;
 
+      // Epic 10.3: Report AI query start
+      onProgress?.({
+        stage: 'auditing',
+        message: 'Consulting AI Security Auditor...',
+        progress: 40
+      });
+
       console.log('[ForgeService] Sending security audit request to AI...');
 
       const auditResponse = await AIController.askAI(auditPrompt, {
         task: 'security_audit',
         appName: manifest.appName
       }, model);
+
+      // Epic 10.3: Report AI response received
+      onProgress?.({
+        stage: 'auditing',
+        message: 'Processing security verdict...',
+        progress: 75
+      });
 
       if (!auditResponse.success) {
         console.error('[ForgeService] Security audit failed:', auditResponse.error);
@@ -353,6 +380,13 @@ Analyze the commands above and respond with JSON:`;
       // Parse the audit response
       const sanitized = this.sanitizeJson(auditResponse.response);
       const audit = JSON.parse(sanitized);
+
+      // Epic 10.3: Report audit complete
+      onProgress?.({
+        stage: 'auditing',
+        message: `Audit complete: ${audit.riskLevel} risk`,
+        progress: 100
+      });
 
       console.log('[ForgeService] Security Audit Result:', {
         safe: audit.safe,
