@@ -305,6 +305,7 @@ window.electronAPI = {
     generate: (params) => ipcRenderer.invoke('cloudseeder:generate', params),
     list: () => ipcRenderer.invoke('cloudseeder:list'),
     delete: (params) => ipcRenderer.invoke('cloudseeder:delete', params),
+    validateGates: (params) => ipcRenderer.invoke('cloudseeder:validate-gates', params),
   },
 }
 
