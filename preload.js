@@ -307,6 +307,18 @@ window.electronAPI = {
     delete: (params) => ipcRenderer.invoke('cloudseeder:delete', params),
     validateGates: (params) => ipcRenderer.invoke('cloudseeder:validate-gates', params),
   },
+
+  // Proxmox Deployment Controller APIs (BMAD Architecture - Epic 11.9: Proxmox Sovereignty)
+  proxmox: {
+    configure: (params) => ipcRenderer.invoke('proxmox:configure', params),
+    validateCredentials: () => ipcRenderer.invoke('proxmox:validate-credentials'),
+    deploy: (params) => ipcRenderer.invoke('proxmox:deploy', params),
+    rollback: (params) => ipcRenderer.invoke('proxmox:rollback', params),
+    resetRollback: (params) => ipcRenderer.invoke('proxmox:reset-rollback', params),
+    dryRun: (params) => ipcRenderer.invoke('proxmox:dry-run', params),
+    getHistory: (params) => ipcRenderer.invoke('proxmox:get-history', params),
+    getActive: () => ipcRenderer.invoke('proxmox:get-active'),
+  },
 }
 
 ;(function initInspector() {
