@@ -1,0 +1,127 @@
+{
+  "name": "katechon3-platform",
+  "displayName": "Katechon3 Autonomous Intelligence Platform",
+  "description": "Multi-service AI research and publishing platform with Fediverse integration",
+  "version": "1.0.0",
+  "author": "Platform Engineer",
+
+  "repositories": [
+    {
+      "name": "katechon3",
+      "path": "../katechon3",
+      "role": "application",
+      "primary": true,
+      "services": [
+        {
+          "name": "katechon-api",
+          "type": "process",
+          "entrypoint": "npm start",
+          "ports": [3000],
+          "environment": {
+            "NODE_ENV": "production",
+            "REDIS_HOST": "localhost",
+            "REDIS_PORT": "6379",
+            "POSTGRES_HOST": "localhost",
+            "POSTGRES_PORT": "5432"
+          },
+          "dependencies": ["katechon-infra/redis", "katechon-infra/postgres"],
+          "healthcheck": {
+            "type": "http",
+            "endpoint": "/health",
+            "interval": 5000,
+            "timeout": 2000
+          }
+        }
+      ]
+    },
+    {
+      "name": "katechon-infra",
+      "path": "../katechon-infra",
+      "role": "infrastructure",
+      "services": [
+        {
+          "name": "redis",
+          "type": "compose",
+          "entrypoint": "docker-compose.yml",
+          "ports": [6379],
+          "healthcheck": {
+            "type": "tcp",
+            "endpoint": "6379",
+            "interval": 3000,
+            "timeout": 1000
+          }
+        },
+        {
+          "name": "postgres",
+          "type": "compose",
+          "entrypoint": "docker-compose.yml",
+          "ports": [5432],
+          "environment": {
+            "POSTGRES_PASSWORD": "changeme",
+            "POSTGRES_DB": "katechon"
+          },
+          "healthcheck": {
+            "type": "command",
+            "endpoint": "pg_isready -U postgres",
+            "interval": 5000,
+            "timeout": 2000
+          }
+        },
+        {
+          "name": "ollama",
+          "type": "compose",
+          "entrypoint": "docker-compose.yml",
+          "ports": [11434],
+          "resources": {
+            "gpu": true,
+            "gpuMemoryGB": 8,
+            "memoryLimitMB": 16384
+          },
+          "healthcheck": {
+            "type": "http",
+            "endpoint": "/api/tags",
+            "interval": 10000,
+            "timeout": 5000
+          }
+        }
+      ]
+    }
+  ],
+
+  "links": [
+    {
+      "source": "katechon-infra/redis",
+      "target": "katechon3",
+      "mapping": {
+        "port": "REDIS_PORT",
+        "host": "REDIS_HOST"
+      }
+    },
+    {
+      "source": "katechon-infra/postgres",
+      "target": "katechon3",
+      "mapping": {
+        "port": "POSTGRES_PORT",
+        "host": "POSTGRES_HOST"
+      }
+    },
+    {
+      "source": "katechon-infra/ollama",
+      "target": "katechon3",
+      "mapping": {
+        "port": "OLLAMA_API_PORT",
+        "host": "OLLAMA_API_HOST"
+      }
+    }
+  ],
+
+  "export": {
+    "target": "cloudseeder",
+    "domain": "katechon.example.com",
+    "ssl": true,
+    "assets": [
+      "../models/llama-7b.gguf",
+      "../models/embeddings-v1.gguf"
+    ]
+  }
+}

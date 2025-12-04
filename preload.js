@@ -227,6 +227,21 @@ window.electronAPI = {
     get: () => ipcRenderer.invoke('metrics:get'),
     reset: () => ipcRenderer.invoke('metrics:reset'),
   },
+
+  // Project APIs (BMAD Architecture - Epic 11.1: The Service Orchestrator)
+  project: {
+    create: (params) => ipcRenderer.invoke('project:create', params),
+    load: (params) => ipcRenderer.invoke('project:load', params),
+    save: (params) => ipcRenderer.invoke('project:save', params),
+    setCurrent: (params) => ipcRenderer.invoke('project:set-current', params),
+    getCurrent: () => ipcRenderer.invoke('project:get-current'),
+    getAll: () => ipcRenderer.invoke('project:get-all'),
+    get: (params) => ipcRenderer.invoke('project:get', params),
+    addRepo: (params) => ipcRenderer.invoke('project:add-repo', params),
+    removeRepo: (params) => ipcRenderer.invoke('project:remove-repo', params),
+    getServices: (params) => ipcRenderer.invoke('project:get-services', params),
+    delete: (params) => ipcRenderer.invoke('project:delete', params),
+  },
 }
 
 ;(function initInspector() {
