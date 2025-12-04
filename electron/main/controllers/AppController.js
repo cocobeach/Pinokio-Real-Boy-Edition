@@ -27,6 +27,10 @@ const MultiServicePTYManager = require('../services/MultiServicePTYManager'); //
 const CredentialBrokerService = require('../services/CredentialBrokerService'); // Epic 11.8: Agentic Credential Broker
 const ContainerService = require('../services/ContainerService'); // Epic 11.3: Container Engine Orchestrator
 const AppLinkerService = require('../services/AppLinkerService'); // Epic 11.4: AppLinker (Dynamic Config Sync)
+const ApiTestRunnerService = require('../services/ApiTestRunnerService'); // Epic 11.7: Agentic API E2E Testing
+
+// Test Suites
+const Epic11TestSuites = require('../tests/epic11-test-suites'); // Epic 11.7: Test Suites
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -98,6 +102,10 @@ class AppController {
 
       // Setup IPC handlers
       this.setupIpcHandlers();
+
+      // Register test suites (Epic 11.7)
+      Epic11TestSuites.initialize();
+      console.log('[AppController] Epic 11 test suites registered');
 
       // Create main window
       await this.createMainWindow();
@@ -413,6 +421,9 @@ class AppController {
     // AppLinker Service handlers (Epic 11.4: Dynamic Config Sync)
     AppLinkerService.setupIpcHandlers(IpcRouter);
 
+    // API Test Runner handlers (Epic 11.7: Agentic API E2E Testing)
+    ApiTestRunnerService.setupIpcHandlers(IpcRouter);
+
     // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
     IpcRouter.handle('window:minimize', async () => {
       const mainWindow = WindowManager.getMainWindow();
@@ -516,6 +527,7 @@ class AppController {
       await CredentialBrokerService.destroy();  // Epic 11.8: Save encrypted credentials
       await ContainerService.destroy();  // Epic 11.3: Stop all containers and log streaming
       await AppLinkerService.destroy();  // Epic 11.4: Stop all watch processes
+      ApiTestRunnerService.destroy();  // Epic 11.7: Clean up test runner state
       KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();

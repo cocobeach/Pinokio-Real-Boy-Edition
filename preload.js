@@ -288,6 +288,17 @@ window.electronAPI = {
     watchStop: (params) => ipcRenderer.invoke('applinker:watch-stop', params),
     watchStatus: (params) => ipcRenderer.invoke('applinker:watch-status', params),
   },
+
+  // API Test Runner APIs (BMAD Architecture - Epic 11.7: Agentic API E2E Testing)
+  apiTest: {
+    runTest: (params) => ipcRenderer.invoke('api-test:run-test', params),
+    runSuite: (params) => ipcRenderer.invoke('api-test:run-suite', params),
+    runAll: (params) => ipcRenderer.invoke('api-test:run-all', params),
+    listSuites: () => ipcRenderer.invoke('api-test:list-suites'),
+    getResults: (params) => ipcRenderer.invoke('api-test:get-results', params),
+    clearResults: () => ipcRenderer.invoke('api-test:clear-results'),
+    getMetrics: () => ipcRenderer.invoke('api-test:get-metrics'),
+  },
 }
 
 ;(function initInspector() {
