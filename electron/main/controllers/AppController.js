@@ -23,6 +23,7 @@ const PlanExecutor = require('../services/PlanExecutor'); // Epic 9: The Synergi
 const VectorMemoryService = require('../services/VectorMemoryService'); // Epic 10.5: The Durable Mind - Vector Memory
 const MetricsService = require('../services/MetricsService'); // Epic 10.8: Integration Testing & Metrics
 const ProjectService = require('../services/ProjectService'); // Epic 11.1: The Service Orchestrator - Project Grouping
+const MultiServicePTYManager = require('../services/MultiServicePTYManager'); // Epic 11.2: Multi-Service Terminal UX
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -394,6 +395,9 @@ class AppController {
     // Project Service handlers (Epic 11.1: The Service Orchestrator - Project Grouping)
     ProjectService.setupIpcHandlers(IpcRouter);
 
+    // Multi-Service PTY Manager handlers (Epic 11.2: Multi-Service Terminal UX)
+    MultiServicePTYManager.setupIpcHandlers(IpcRouter);
+
     // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
     IpcRouter.handle('window:minimize', async () => {
       const mainWindow = WindowManager.getMainWindow();
@@ -493,6 +497,7 @@ class AppController {
       await VectorMemoryService.destroy();  // Epic 10.5: Save vector memory
       await MetricsService.destroy();  // Epic 10.8: Close metrics server
       ProjectService.destroy();  // Epic 11.1: Clean up project state
+      MultiServicePTYManager.destroy();  // Epic 11.2: Close multi-service sessions
       KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();

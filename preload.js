@@ -242,6 +242,20 @@ window.electronAPI = {
     getServices: (params) => ipcRenderer.invoke('project:get-services', params),
     delete: (params) => ipcRenderer.invoke('project:delete', params),
   },
+
+  // Multi-Service PTY APIs (BMAD Architecture - Epic 11.2: Multi-Service Terminal UX)
+  multiServicePTY: {
+    initProject: (params) => ipcRenderer.invoke('multi-pty:init-project', params),
+    switchTab: (params) => ipcRenderer.invoke('multi-pty:switch-tab', params),
+    getLogs: (params) => ipcRenderer.invoke('multi-pty:get-logs', params),
+    search: (params) => ipcRenderer.invoke('multi-pty:search', params),
+    getServices: (params) => ipcRenderer.invoke('multi-pty:get-services', params),
+    clearLogs: (params) => ipcRenderer.invoke('multi-pty:clear-logs', params),
+    closeProject: (params) => ipcRenderer.invoke('multi-pty:close-project', params),
+    getState: () => ipcRenderer.invoke('multi-pty:get-state'),
+    onLog: (callback) => ipcRenderer.on('multi-pty:log', (event, data) => callback(data)),
+    onTabSwitch: (callback) => ipcRenderer.on('multi-pty:tab-switch', (event, data) => callback(data)),
+  },
 }
 
 ;(function initInspector() {
