@@ -136,6 +136,12 @@ window.electronAPI = {
     getDownloadPlan: (params) => ipcRenderer.invoke('gas:get-download-plan', params),
     findDuplicates: (params) => ipcRenderer.invoke('gas:find-duplicates', params),
     stats: () => ipcRenderer.invoke('gas:stats'),
+
+    // Epic 10.6: Download Resume & Integrity Checks
+    downloadWithResume: (params) => ipcRenderer.invoke('gas:download-with-resume', params),
+    checkResume: (params) => ipcRenderer.invoke('gas:check-resume', params),
+    clearDownloadMetadata: (params) => ipcRenderer.invoke('gas:clear-download-metadata', params),
+    onDownloadProgress: (callback) => ipcRenderer.on('gas:download-progress', (event, data) => callback(data)),
   },
 
   // AI Forge APIs (BMAD Architecture - Phase 3 & 4)

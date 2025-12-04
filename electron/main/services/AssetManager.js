@@ -445,6 +445,293 @@ class AssetManager {
   }
 
   /**
+   * Epic 10.6: Get download metadata path
+   * @param {string} filePath - File being downloaded
+   * @returns {string} Metadata file path
+   */
+  getMetadataPath(filePath) {
+    return `${filePath}.download-meta`;
+  }
+
+  /**
+   * Epic 10.6: Save download metadata for resume capability
+   * @param {string} filePath - File being downloaded
+   * @param {Object} metadata - Download metadata
+   */
+  saveDownloadMetadata(filePath, metadata) {
+    try {
+      const metaPath = this.getMetadataPath(filePath);
+      fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
+    } catch (error) {
+      console.error('[AssetManager] Error saving download metadata:', error);
+    }
+  }
+
+  /**
+   * Epic 10.6: Load download metadata
+   * @param {string} filePath - File being downloaded
+   * @returns {Object|null} Metadata or null if not found
+   */
+  loadDownloadMetadata(filePath) {
+    try {
+      const metaPath = this.getMetadataPath(filePath);
+      if (fs.existsSync(metaPath)) {
+        return JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+      }
+    } catch (error) {
+      console.error('[AssetManager] Error loading download metadata:', error);
+    }
+    return null;
+  }
+
+  /**
+   * Epic 10.6: Clear download metadata
+   * @param {string} filePath - File being downloaded
+   */
+  clearDownloadMetadata(filePath) {
+    try {
+      const metaPath = this.getMetadataPath(filePath);
+      if (fs.existsSync(metaPath)) {
+        fs.unlinkSync(metaPath);
+      }
+    } catch (error) {
+      console.error('[AssetManager] Error clearing download metadata:', error);
+    }
+  }
+
+  /**
+   * Epic 10.6: Download file with resume support and integrity checking
+   * @param {string} url - Source URL
+   * @param {string} destPath - Destination path
+   * @param {Object} options - Download options
+   * @param {string} options.expectedChecksum - Expected SHA256 checksum (optional)
+   * @param {Function} options.onProgress - Progress callback
+   * @param {boolean} options.resume - Enable resume (default: true)
+   * @returns {Promise<Object>} Download result
+   */
+  async downloadWithResume(url, destPath, options = {}) {
+    const { expectedChecksum = null, onProgress = null, resume = true } = options;
+    const https = require('https');
+    const http = require('http');
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Ensure directory exists
+        const dir = path.dirname(destPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+
+        // Check for partial download
+        let bytesDownloaded = 0;
+        let totalBytes = 0;
+        let fileHandle = null;
+
+        if (resume) {
+          const metadata = this.loadDownloadMetadata(destPath);
+
+          if (metadata && fs.existsSync(destPath)) {
+            const stats = fs.statSync(destPath);
+            bytesDownloaded = stats.size;
+
+            // Verify metadata matches
+            if (metadata.url === url && metadata.bytesDownloaded === bytesDownloaded) {
+              console.log(`[AssetManager] Resuming download from ${bytesDownloaded} bytes`);
+              onProgress?.({
+                stage: 'resuming',
+                message: `Resuming from ${(bytesDownloaded / 1024 / 1024).toFixed(1)}MB`,
+                bytesDownloaded,
+                percentage: metadata.totalBytes ? Math.floor((bytesDownloaded / metadata.totalBytes) * 100) : 0
+              });
+
+              // Open file in append mode
+              fileHandle = fs.createWriteStream(destPath, { flags: 'a' });
+            } else {
+              // Metadata mismatch, start fresh
+              bytesDownloaded = 0;
+              fs.unlinkSync(destPath);
+              this.clearDownloadMetadata(destPath);
+              fileHandle = fs.createWriteStream(destPath);
+            }
+          } else {
+            // No existing download
+            fileHandle = fs.createWriteStream(destPath);
+          }
+        } else {
+          // Resume disabled, always start fresh
+          if (fs.existsSync(destPath)) {
+            fs.unlinkSync(destPath);
+          }
+          this.clearDownloadMetadata(destPath);
+          fileHandle = fs.createWriteStream(destPath);
+        }
+
+        // Determine protocol
+        const urlObj = new URL(url);
+        const protocol = urlObj.protocol === 'https:' ? https : http;
+
+        // Build request headers
+        const headers = {};
+        if (bytesDownloaded > 0) {
+          headers['Range'] = `bytes=${bytesDownloaded}-`;
+        }
+
+        // Make request
+        const request = protocol.get(url, { headers }, (response) => {
+          // Handle redirects
+          if (response.statusCode === 301 || response.statusCode === 302) {
+            const redirectUrl = response.headers.location;
+            console.log(`[AssetManager] Following redirect to: ${redirectUrl}`);
+            fileHandle.close();
+
+            // Retry with redirect URL
+            this.downloadWithResume(redirectUrl, destPath, options)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+
+          // Handle resume responses
+          if (response.statusCode === 206) {
+            // Partial content - resume successful
+            console.log('[AssetManager] Resume accepted (206 Partial Content)');
+          } else if (response.statusCode === 200) {
+            // Full content - server doesn't support resume or starting fresh
+            if (bytesDownloaded > 0) {
+              console.log('[AssetManager] Resume not supported, restarting download');
+              fileHandle.close();
+              fs.unlinkSync(destPath);
+              bytesDownloaded = 0;
+              fileHandle = fs.createWriteStream(destPath);
+            }
+          } else {
+            fileHandle.close();
+            reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+            return;
+          }
+
+          // Get total size
+          const contentLength = parseInt(response.headers['content-length'] || '0', 10);
+          totalBytes = bytesDownloaded + contentLength;
+
+          console.log(`[AssetManager] Downloading ${url}`);
+          console.log(`[AssetManager] Progress: ${bytesDownloaded}/${totalBytes} bytes`);
+
+          // Save initial metadata
+          if (resume) {
+            this.saveDownloadMetadata(destPath, {
+              url,
+              bytesDownloaded,
+              totalBytes,
+              expectedChecksum,
+              startedAt: new Date().toISOString()
+            });
+          }
+
+          let lastProgressUpdate = Date.now();
+
+          // Stream data to file
+          response.on('data', (chunk) => {
+            fileHandle.write(chunk);
+            bytesDownloaded += chunk.length;
+
+            // Update metadata and progress every 1 second
+            const now = Date.now();
+            if (now - lastProgressUpdate > 1000) {
+              if (resume) {
+                this.saveDownloadMetadata(destPath, {
+                  url,
+                  bytesDownloaded,
+                  totalBytes,
+                  expectedChecksum,
+                  lastUpdate: new Date().toISOString()
+                });
+              }
+
+              onProgress?.({
+                stage: 'downloading',
+                message: 'Downloading...',
+                bytesDownloaded,
+                totalBytes,
+                percentage: totalBytes ? Math.floor((bytesDownloaded / totalBytes) * 100) : 0
+              });
+
+              lastProgressUpdate = now;
+            }
+          });
+
+          response.on('end', async () => {
+            fileHandle.close();
+
+            // Final progress update
+            onProgress?.({
+              stage: 'downloading',
+              message: 'Download complete',
+              bytesDownloaded,
+              totalBytes,
+              percentage: 100
+            });
+
+            // Epic 10.6: Verify checksum if provided
+            if (expectedChecksum) {
+              try {
+                onProgress?.({ stage: 'verifying', message: 'Verifying checksum...' });
+
+                const actualChecksum = await this.computeFileHash(destPath);
+
+                if (actualChecksum !== expectedChecksum) {
+                  // Checksum mismatch - delete file and fail
+                  fs.unlinkSync(destPath);
+                  this.clearDownloadMetadata(destPath);
+                  reject(new Error(`Checksum mismatch: expected ${expectedChecksum}, got ${actualChecksum}`));
+                  return;
+                }
+
+                console.log('[AssetManager] Checksum verified ✓');
+                onProgress?.({ stage: 'verified', message: 'Checksum verified' });
+
+              } catch (error) {
+                fs.unlinkSync(destPath);
+                this.clearDownloadMetadata(destPath);
+                reject(new Error(`Checksum verification failed: ${error.message}`));
+                return;
+              }
+            }
+
+            // Clear metadata on successful completion
+            this.clearDownloadMetadata(destPath);
+
+            resolve({
+              success: true,
+              path: destPath,
+              bytesDownloaded,
+              checksumVerified: !!expectedChecksum
+            });
+          });
+
+          response.on('error', (error) => {
+            fileHandle.close();
+            reject(error);
+          });
+        });
+
+        request.on('error', (error) => {
+          if (fileHandle) fileHandle.close();
+          reject(error);
+        });
+
+        request.setTimeout(30000, () => {
+          request.abort();
+          reject(new Error('Download timeout'));
+        });
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
    * Setup IPC handlers for asset operations
    * @param {IpcRouter} ipcRouter - IPC router instance
    */
@@ -477,6 +764,35 @@ class AssetManager {
     // Get stats
     ipcRouter.handle('gas:stats', async () => {
       return this.getStats();
+    });
+
+    // Epic 10.6: Download with resume
+    ipcRouter.handle('gas:download-with-resume', async (event, { url, destPath, options }) => {
+      try {
+        return await this.downloadWithResume(url, destPath, {
+          ...options,
+          onProgress: (progress) => {
+            event.sender.send('gas:download-progress', { url, destPath, ...progress });
+          }
+        });
+      } catch (error) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Epic 10.6: Check for resume capability
+    ipcRouter.handle('gas:check-resume', async (event, { destPath }) => {
+      const metadata = this.loadDownloadMetadata(destPath);
+      return {
+        canResume: !!metadata,
+        metadata: metadata || null
+      };
+    });
+
+    // Epic 10.6: Clear download metadata
+    ipcRouter.handle('gas:clear-download-metadata', async (event, { destPath }) => {
+      this.clearDownloadMetadata(destPath);
+      return { success: true };
     });
 
     console.log('[AssetManager] IPC handlers registered');
