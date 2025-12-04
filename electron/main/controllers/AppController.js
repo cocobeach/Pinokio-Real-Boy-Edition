@@ -376,6 +376,46 @@ class AppController {
     // Plan Executor handlers (Epic 9: The Synergistic Forge)
     PlanExecutor.setupIpcHandlers(IpcRouter);
 
+    // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
+    IpcRouter.handle('window:minimize', async () => {
+      const mainWindow = WindowManager.getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.minimize();
+        return { success: true };
+      }
+      return { success: false, error: 'No main window available' };
+    });
+
+    IpcRouter.handle('window:maximize', async () => {
+      const mainWindow = WindowManager.getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (mainWindow.isMaximized()) {
+          mainWindow.unmaximize();
+        } else {
+          mainWindow.maximize();
+        }
+        return { success: true, maximized: mainWindow.isMaximized() };
+      }
+      return { success: false, error: 'No main window available' };
+    });
+
+    IpcRouter.handle('window:close', async () => {
+      const mainWindow = WindowManager.getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.close();
+        return { success: true };
+      }
+      return { success: false, error: 'No main window available' };
+    });
+
+    IpcRouter.handle('window:is-maximized', async () => {
+      const mainWindow = WindowManager.getMainWindow();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        return { success: true, maximized: mainWindow.isMaximized() };
+      }
+      return { success: false, error: 'No main window available' };
+    });
+
     // Custom prompt handler (from original full.js)
     IpcRouter.on('prompt', (eventRet, arg) => {
       const mainWindow = WindowManager.getMainWindow();

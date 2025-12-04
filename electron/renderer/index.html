@@ -20,9 +20,65 @@
       color: #e0e0e0;
     }
 
+    /* Window Title Bar (Epic 10.1) */
+    #window-titlebar {
+      height: 32px;
+      width: 100%;
+      background: linear-gradient(180deg, #2d2d2d 0%, #252526 100%);
+      border-bottom: 1px solid #1a1a1a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      -webkit-app-region: drag;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    #window-titlebar .title-content {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #cccccc;
+      font-weight: 500;
+    }
+
+    #window-titlebar .title-icon {
+      font-size: 16px;
+    }
+
+    #window-titlebar .window-controls {
+      display: flex;
+      gap: 8px;
+      -webkit-app-region: no-drag;
+    }
+
+    #window-titlebar .window-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s ease;
+      color: #cccccc;
+    }
+
+    #window-titlebar .window-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    #window-titlebar .window-btn.close:hover {
+      background: #e81123;
+      color: white;
+    }
+
     #command-center-shell {
       display: flex;
-      height: 100vh;
+      height: calc(100vh - 32px);
       width: 100vw;
     }
 
@@ -51,6 +107,7 @@
       transition: background 0.2s ease;
       font-size: 24px;
       position: relative;
+      -webkit-app-region: no-drag;
     }
 
     #native-sidebar .nav-icon:hover {
@@ -119,6 +176,7 @@
       font-size: 18px;
       opacity: 0.7;
       transition: opacity 0.2s;
+      -webkit-app-region: no-drag;
     }
 
     #info-sidebar .sidebar-header .collapse-btn:hover {
@@ -151,6 +209,7 @@
       font-size: 14px;
       opacity: 0.5;
       transition: opacity 0.2s;
+      -webkit-app-region: no-drag;
     }
 
     .widget-title .refresh-btn:hover {
@@ -393,6 +452,7 @@
       cursor: pointer;
       font-size: 14px;
       transition: background 0.2s ease;
+      -webkit-app-region: no-drag;
     }
 
     #terminal-header .control-btn:hover {
@@ -456,6 +516,19 @@
   </style>
 </head>
 <body>
+  <!-- Window Title Bar (Epic 10.1) -->
+  <div id="window-titlebar">
+    <div class="title-content">
+      <span class="title-icon">🤖</span>
+      <span>Pinokio: Real Boy Edition</span>
+    </div>
+    <div class="window-controls">
+      <div class="window-btn minimize" id="window-minimize" title="Minimize">−</div>
+      <div class="window-btn maximize" id="window-maximize" title="Maximize">□</div>
+      <div class="window-btn close" id="window-close" title="Close">×</div>
+    </div>
+  </div>
+
   <!-- Loading Overlay -->
   <div id="loading-overlay">
     <div class="spinner"></div>
@@ -918,6 +991,32 @@
 
     console.log('[Command Center] Initialization complete');
     console.log('[Command Center] Epic 9 Sidebar Features: Git Status, Active Plan, Hardware Monitoring');
+
+    // === EPIC 10.1: WINDOW CONTROLS ===
+
+    // Window control buttons
+    document.getElementById('window-minimize').addEventListener('click', () => {
+      console.log('[Window Controls] Minimize requested');
+      if (window.electronAPI && window.electronAPI.window) {
+        window.electronAPI.window.minimize();
+      }
+    });
+
+    document.getElementById('window-maximize').addEventListener('click', () => {
+      console.log('[Window Controls] Maximize/Restore requested');
+      if (window.electronAPI && window.electronAPI.window) {
+        window.electronAPI.window.maximize();
+      }
+    });
+
+    document.getElementById('window-close').addEventListener('click', () => {
+      console.log('[Window Controls] Close requested');
+      if (window.electronAPI && window.electronAPI.window) {
+        window.electronAPI.window.close();
+      }
+    });
+
+    console.log('[Command Center] Epic 10.1: Window Dragging & Controls Initialized');
   </script>
 </body>
 </html>

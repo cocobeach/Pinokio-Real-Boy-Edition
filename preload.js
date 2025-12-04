@@ -189,6 +189,14 @@ window.electronAPI = {
     history: () => ipcRenderer.invoke('plan-executor:history'),
     onProgress: (callback) => ipcRenderer.on('plan-executor:progress', (event, data) => callback(data)),
   },
+
+  // Window Control APIs (BMAD Architecture - Epic 10.1: The Durable Mind)
+  window: {
+    minimize: () => ipcRenderer.invoke('window:minimize'),
+    maximize: () => ipcRenderer.invoke('window:maximize'),
+    close: () => ipcRenderer.invoke('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+  },
 }
 
 ;(function initInspector() {
