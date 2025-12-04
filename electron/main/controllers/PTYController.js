@@ -8,6 +8,7 @@ const pty = require('node-pty');
 const os = require('os');
 const path = require('path');
 const fs = require('fs');
+const ConfigService = require('../services/ConfigService');
 
 class PTYController {
   constructor() {
@@ -316,13 +317,163 @@ class PTYController {
       return { sessions: this.getAllSessions() };
     });
 
+    // Check for saved session state (Epic 10.2)
+    ipcRouter.handle('terminal:has-saved-state', async () => {
+      const savedState = this.loadSessionState();
+      return {
+        success: true,
+        hasSavedState: savedState !== null,
+        sessionCount: savedState ? savedState.sessions.length : 0
+      };
+    });
+
+    // Restore saved sessions (Epic 10.2)
+    ipcRouter.handle('terminal:restore-sessions', async (event) => {
+      try {
+        const restoredIds = this.restoreSessions({ eventSender: event.sender });
+        return {
+          success: true,
+          restoredSessions: restoredIds,
+          count: restoredIds.length
+        };
+      } catch (error) {
+        console.error('[PTYController] Error restoring sessions:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
+    // Clear saved session state without restoring (Epic 10.2)
+    ipcRouter.handle('terminal:clear-saved-state', async () => {
+      try {
+        ConfigService.set('ptySessionState', null);
+        return { success: true };
+      } catch (error) {
+        console.error('[PTYController] Error clearing saved state:', error);
+        return { success: false, error: error.message };
+      }
+    });
+
     console.log('[PTYController] IPC handlers registered');
   }
 
   /**
+   * Save current session state to ConfigService
+   * Epic 10.2: The Durable Mind - PTY Session Persistence
+   */
+  saveSessionState() {
+    const sessionState = {
+      nextId: this.nextId,
+      sessions: Array.from(this.sessions.values()).map(session => ({
+        id: session.id,
+        shell: session.shell,
+        cwd: session.cwd,
+        createdAt: session.createdAt
+      }))
+    };
+
+    ConfigService.set('ptySessionState', sessionState);
+    console.log(`[PTYController] Saved ${sessionState.sessions.length} session(s) to config`);
+    return sessionState;
+  }
+
+  /**
+   * Load session state from ConfigService
+   * Epic 10.2: The Durable Mind - PTY Session Persistence
+   */
+  loadSessionState() {
+    const savedState = ConfigService.get('ptySessionState');
+    if (!savedState || !savedState.sessions || savedState.sessions.length === 0) {
+      console.log('[PTYController] No saved session state found');
+      return null;
+    }
+
+    console.log(`[PTYController] Found ${savedState.sessions.length} saved session(s)`);
+    return savedState;
+  }
+
+  /**
+   * Restore sessions from saved state
+   * Epic 10.2: The Durable Mind - PTY Session Persistence
+   * @param {Object} options - Options for restoration
+   * @param {Object} options.eventSender - Event sender for forwarding PTY output
+   * @returns {Array} List of restored session IDs
+   */
+  restoreSessions(options = {}) {
+    const savedState = this.loadSessionState();
+    if (!savedState) {
+      return [];
+    }
+
+    const restoredSessions = [];
+
+    // Restore nextId to avoid conflicts
+    this.nextId = savedState.nextId || this.nextId;
+
+    // Restore each session
+    for (const savedSession of savedState.sessions) {
+      try {
+        console.log(`[PTYController] Restoring session ${savedSession.id} with cwd: ${savedSession.cwd}`);
+
+        // Create new PTY with saved configuration
+        const shell = savedSession.shell || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || '/bin/bash');
+        const augmentedEnv = this.getAugmentedEnv(process.env);
+
+        const ptyProcess = pty.spawn(shell, [], {
+          name: 'xterm-256color',
+          cols: 80,
+          rows: 30,
+          cwd: savedSession.cwd || process.env.HOME || process.cwd(),
+          env: augmentedEnv
+        });
+
+        // Store restored session
+        this.sessions.set(savedSession.id, {
+          id: savedSession.id,
+          pty: ptyProcess,
+          shell: shell,
+          cwd: savedSession.cwd,
+          createdAt: savedSession.createdAt,
+          restored: true
+        });
+
+        // Setup event forwarding if eventSender provided
+        if (options.eventSender) {
+          ptyProcess.onData((data) => {
+            options.eventSender.send('terminal:data', { sessionId: savedSession.id, data });
+          });
+
+          ptyProcess.onExit(({ exitCode, signal }) => {
+            console.log(`[PTYController] Restored session ${savedSession.id} exited with code ${exitCode}`);
+            options.eventSender.send('terminal:exit', { sessionId: savedSession.id, exitCode, signal });
+            this.sessions.delete(savedSession.id);
+          });
+        }
+
+        restoredSessions.push(savedSession.id);
+        console.log(`[PTYController] Successfully restored session ${savedSession.id}`);
+
+      } catch (error) {
+        console.error(`[PTYController] Failed to restore session ${savedSession.id}:`, error);
+      }
+    }
+
+    // Clear saved state after successful restoration
+    if (restoredSessions.length > 0) {
+      ConfigService.set('ptySessionState', null);
+      console.log(`[PTYController] Restored ${restoredSessions.length} session(s)`);
+    }
+
+    return restoredSessions;
+  }
+
+  /**
    * Cleanup all sessions
+   * Epic 10.2: Save session state before destroying
    */
   destroy() {
+    // Save session state before destroying
+    this.saveSessionState();
+
     for (const [sessionId, session] of this.sessions) {
       try {
         session.pty.kill();

@@ -78,6 +78,11 @@ window.electronAPI = {
     list: () => ipcRenderer.invoke('terminal:list'),
     onData: (callback) => ipcRenderer.on('terminal:data', (event, data) => callback(data)),
     onExit: (callback) => ipcRenderer.on('terminal:exit', (event, data) => callback(data)),
+
+    // Epic 10.2: Session Persistence
+    hasSavedState: () => ipcRenderer.invoke('terminal:has-saved-state'),
+    restoreSessions: () => ipcRenderer.invoke('terminal:restore-sessions'),
+    clearSavedState: () => ipcRenderer.invoke('terminal:clear-saved-state'),
   },
 
   // AI APIs (BMAD Architecture - Enhanced for Epic 8)
