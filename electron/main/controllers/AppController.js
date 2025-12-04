@@ -28,6 +28,7 @@ const CredentialBrokerService = require('../services/CredentialBrokerService'); 
 const ContainerService = require('../services/ContainerService'); // Epic 11.3: Container Engine Orchestrator
 const AppLinkerService = require('../services/AppLinkerService'); // Epic 11.4: AppLinker (Dynamic Config Sync)
 const ApiTestRunnerService = require('../services/ApiTestRunnerService'); // Epic 11.7: Agentic API E2E Testing
+const CloudSeederService = require('../services/CloudSeederService'); // Epic 11.6: CloudSeeder Artifact Generator
 
 // Test Suites
 const Epic11TestSuites = require('../tests/epic11-test-suites'); // Epic 11.7: Test Suites
@@ -424,6 +425,9 @@ class AppController {
     // API Test Runner handlers (Epic 11.7: Agentic API E2E Testing)
     ApiTestRunnerService.setupIpcHandlers(IpcRouter);
 
+    // CloudSeeder handlers (Epic 11.6: CloudSeeder Artifact Generator)
+    CloudSeederService.setupIpcHandlers(IpcRouter);
+
     // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
     IpcRouter.handle('window:minimize', async () => {
       const mainWindow = WindowManager.getMainWindow();
@@ -528,6 +532,7 @@ class AppController {
       await ContainerService.destroy();  // Epic 11.3: Stop all containers and log streaming
       await AppLinkerService.destroy();  // Epic 11.4: Stop all watch processes
       ApiTestRunnerService.destroy();  // Epic 11.7: Clean up test runner state
+      CloudSeederService.destroy();  // Epic 11.6: Clean up artifact generation workspace
       KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();

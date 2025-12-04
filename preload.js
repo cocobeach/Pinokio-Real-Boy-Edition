@@ -299,6 +299,13 @@ window.electronAPI = {
     clearResults: () => ipcRenderer.invoke('api-test:clear-results'),
     getMetrics: () => ipcRenderer.invoke('api-test:get-metrics'),
   },
+
+  // CloudSeeder APIs (BMAD Architecture - Epic 11.6: CloudSeeder Artifact Generator)
+  cloudSeeder: {
+    generate: (params) => ipcRenderer.invoke('cloudseeder:generate', params),
+    list: () => ipcRenderer.invoke('cloudseeder:list'),
+    delete: (params) => ipcRenderer.invoke('cloudseeder:delete', params),
+  },
 }
 
 ;(function initInspector() {
