@@ -21,6 +21,7 @@ const FileSystemService = require('../services/FileSystemService'); // Epic 7: A
 const HardwareService = require('../services/HardwareService'); // Epic 8: The Awakened Mind - Hardware Monitoring
 const PlanExecutor = require('../services/PlanExecutor'); // Epic 9: The Synergistic Forge - Plan Automation
 const VectorMemoryService = require('../services/VectorMemoryService'); // Epic 10.5: The Durable Mind - Vector Memory
+const MetricsService = require('../services/MetricsService'); // Epic 10.8: Integration Testing & Metrics
 
 // Controllers
 const PTYController = require('./PTYController');
@@ -83,6 +84,9 @@ class AppController {
 
       // Initialize Vector Memory Service (Epic 10.5)
       await VectorMemoryService.initialize();
+
+      // Initialize Metrics Service (Epic 10.8)
+      await MetricsService.initialize(9090); // Prometheus on port 9090
 
       // Setup IPC handlers
       this.setupIpcHandlers();
@@ -383,6 +387,9 @@ class AppController {
     // Vector Memory Service handlers (Epic 10.5: The Durable Mind - Vector Memory)
     VectorMemoryService.setupIpcHandlers(IpcRouter);
 
+    // Metrics Service handlers (Epic 10.8: Integration Testing & Metrics)
+    MetricsService.setupIpcHandlers(IpcRouter);
+
     // Window Control handlers (Epic 10.1: The Durable Mind - Window Dragging)
     IpcRouter.handle('window:minimize', async () => {
       const mainWindow = WindowManager.getMainWindow();
@@ -480,6 +487,7 @@ class AppController {
       InspectorService.destroy();
       await AIController.destroy();
       await VectorMemoryService.destroy();  // Epic 10.5: Save vector memory
+      await MetricsService.destroy();  // Epic 10.8: Close metrics server
       KernelPatcher.destroy(); // Phase 5: Log stats before shutdown
       AssetManager.destroy();
       PTYController.destroy();

@@ -221,6 +221,12 @@ window.electronAPI = {
     clearCategory: (params) => ipcRenderer.invoke('vector-memory:clear-category', params),
     getStats: () => ipcRenderer.invoke('vector-memory:stats'),
   },
+
+  // Metrics APIs (BMAD Architecture - Epic 10.8: Integration Testing & Metrics)
+  metrics: {
+    get: () => ipcRenderer.invoke('metrics:get'),
+    reset: () => ipcRenderer.invoke('metrics:reset'),
+  },
 }
 
 ;(function initInspector() {
