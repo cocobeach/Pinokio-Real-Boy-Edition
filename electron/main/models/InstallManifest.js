@@ -233,7 +233,18 @@ class InstallManifest {
           venv: "env",
           conda: this.detectedType === 'python' ? 'true' : undefined,
           env: this.envVars
-        }
+        },
+        // Capture local server URL to enable "Open WebUI" button
+        on: [{
+          event: "/http:\\/\\/(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0):\\d+/",
+          run: "method",
+          params: {
+            method: "local.set",
+            params: {
+              url: "{{input.event[0]}}"
+            }
+          }
+        }]
       });
     }
 
