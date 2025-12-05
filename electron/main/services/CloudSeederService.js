@@ -648,10 +648,10 @@ echo "Access via: pct enter \$VMID"
 
 ## Package Contents
 
-${manifest.deployment.includeSource ? '- `repositories/` - Source code for all project repositories' : ''}
-${manifest.deployment.includeContainers ? '- `containers/` - Exported container images (.tar files)' : ''}
-- `deployment.json` - Deployment manifest with service definitions
-- `README.md` - This file
+${manifest.deployment.includeSource ? '- \`repositories/\` - Source code for all project repositories' : ''}
+${manifest.deployment.includeContainers ? '- \`containers/\` - Exported container images (.tar files)' : ''}
+- \`deployment.json\` - Deployment manifest with service definitions
+- \`README.md\` - This file
 
 ## Deployment Instructions
 
