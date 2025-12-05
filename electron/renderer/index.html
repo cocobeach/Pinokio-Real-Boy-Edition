@@ -655,6 +655,39 @@
       terminalContent.innerHTML = `<div style="color: #ff6b6b;">Failed to load Pinokio server at ${rootUrl}</div>`;
     });
 
+    // CRITICAL: Comprehensive webview debugging event listeners
+    webview.addEventListener('did-start-loading', () => {
+      console.log('[Webview] 🔄 Start loading:', rootUrl);
+    });
+
+    webview.addEventListener('did-stop-loading', () => {
+      console.log('[Webview] ✅ Stop loading - Success!');
+    });
+
+    webview.addEventListener('did-fail-load', (e) => {
+      console.error('[Webview] ❌ FAIL:', e.errorDescription, 'Code:', e.errorCode, 'URL:', e.validatedURL);
+      // Show error in terminal for user visibility
+      if (terminalContent) {
+        terminalContent.innerHTML += `<div style="color: #ff6b6b;">[Webview Load Fail] ${e.errorDescription} (Code: ${e.errorCode})</div>`;
+      }
+    });
+
+    webview.addEventListener('console-message', (e) => {
+      console.log('[Webview Console]:', e.message);
+    });
+
+    webview.addEventListener('crashed', () => {
+      console.error('[Webview] 💥 CRASHED! Renderer process died.');
+    });
+
+    webview.addEventListener('unresponsive', () => {
+      console.warn('[Webview] ⚠️  UNRESPONSIVE - Page taking too long to respond.');
+    });
+
+    webview.addEventListener('responsive', () => {
+      console.log('[Webview] ✅ RESPONSIVE again - Page recovered.');
+    });
+
     // Load the Pinokio web app
     console.log('[Command Center] Loading webview:', rootUrl);
     webview.src = rootUrl;

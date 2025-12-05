@@ -121,6 +121,8 @@ class WindowManager {
         nativeWindowOpen: true,
         contextIsolation: false,
         nodeIntegrationInSubFrames: true,
+        webviewTag: true,  // CRITICAL: Enables <webview> for localhost:42000 Pinokiod embed
+        allowRunningInsecureContent: true,  // Quiets warnings for localhost dev
         preload: preloadPath
       }
     });
@@ -162,6 +164,8 @@ class WindowManager {
         nativeWindowOpen: true,
         contextIsolation: false,
         nodeIntegrationInSubFrames: true,
+        webviewTag: true,  // Enable webview for secondary windows too
+        allowRunningInsecureContent: true,
         preload: preloadPath
       }
     });
