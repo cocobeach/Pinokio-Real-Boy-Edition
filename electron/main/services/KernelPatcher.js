@@ -177,7 +177,13 @@ class KernelPatcher {
   createInterceptor() {
     const self = this;
 
-    return async function kernelDownloadInterceptor(req, ondata, kernel) {
+    // FIX: Renamed 3rd arg to 'kernelArg' and added fallback logic
+    return async function kernelDownloadInterceptor(req, ondata, kernelArg) {
+      // CRITICAL FIX: Fallback to captured kernel if argument is missing
+      // Pinokiod internal calls often omit the 3rd argument, which would cause
+      // kernel.api.filePath() to crash with "Cannot read property 'api' of undefined"
+      const kernel = kernelArg || self.kernel;
+
       self.interceptedDownloads++;
 
       try {
@@ -194,6 +200,7 @@ class KernelPatcher {
         // Determine target path
         let targetPath;
         if (params.path) {
+          // Now this line won't crash because 'kernel' is guaranteed to be defined
           targetPath = kernel.api.filePath(params.path, req.cwd);
         } else if (params.dir) {
           // If only dir is specified, we can't predict the filename yet

@@ -176,7 +176,7 @@ class AIController {
    * Detect available CLI providers
    */
   async detectCLIProviders() {
-    const timeout = 30000; // 3 second timeout for CLI detection to prevent hangs
+    const timeout = 3000; // 3 second timeout for CLI detection to prevent hangs
 
     // Check for Claude Code CLI
     try {
