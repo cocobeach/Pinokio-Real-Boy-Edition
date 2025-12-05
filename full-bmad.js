@@ -13,11 +13,18 @@ const ConfigService = require('./electron/main/services/ConfigService');
 
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock();
+console.log(`[Pinokio] Single Instance Lock Status: ${gotTheLock}`);
 
+// DEBUG OVERRIDE: If lock fails, log it but DO NOT QUIT immediately for this test session.
+// This allows us to see if a "ghost" lock file is the only issue.
 if (!gotTheLock) {
-  console.log('[Pinokio] Another instance is already running. Exiting.');
-  app.quit();
-} else {
+  console.warn('[Pinokio] ⚠️  Lock failed! Another instance might be running OR lock file is stale.');
+  console.warn('[Pinokio] FORCING STARTUP for debugging...');
+  // app.quit(); // Commented out to force start
+}
+
+// Proceed regardless of lock for this debug session
+{
   // Handle second instance attempt
   app.on('second-instance', (event, commandLine, workingDirectory) => {
     console.log('[Pinokio] Second instance detected, focusing main window');
