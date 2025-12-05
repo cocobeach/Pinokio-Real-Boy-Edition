@@ -65,6 +65,11 @@ class AppController {
       this.pinokiod = new Pinokiod(config);
       console.log('[AppController] Pinokiod initialized');
 
+      // Show splash screen IMMEDIATELY so user knows app is running
+      // CRITICAL: This must be shown BEFORE startPinokiod() because pinokiod
+      // can take 2-5 minutes on first run (downloading Miniconda, Git, Node)
+      WindowManager.createSplashWindow();
+
       // Start Pinokiod server
       await this.startPinokiod();
 
@@ -76,9 +81,6 @@ class AppController {
       // NOTE: Deep Hook now bypasses system binaries (pinokio/bin, pinokio/cache)
       // This ensures Conda/Git/Node installers are handled natively by pinokiod
       await this.applyKernelPatch();
-
-      // Show splash screen
-      WindowManager.createSplashWindow();
 
       // Initialize Browser Service
       BrowserService.initialize({

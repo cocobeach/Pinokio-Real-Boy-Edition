@@ -176,22 +176,24 @@ class AIController {
    * Detect available CLI providers
    */
   async detectCLIProviders() {
+    const timeout = 3000; // 3 second timeout for CLI detection to prevent hangs
+
     // Check for Claude Code CLI
     try {
-      await execAsync('claude-code --version');
+      await execAsync('claude-code --version', { timeout });
       this.providers.claude.available = true;
       console.log('[AIController] Claude Code CLI detected');
     } catch (error) {
-      console.log('[AIController] Claude Code CLI not available');
+      console.log('[AIController] Claude Code CLI not available (or timed out)');
     }
 
     // Check for Gemini Code Assist CLI
     try {
-      await execAsync('gemini-code --version');
+      await execAsync('gemini-code --version', { timeout });
       this.providers.gemini.available = true;
       console.log('[AIController] Gemini Code Assist CLI detected');
     } catch (error) {
-      console.log('[AIController] Gemini Code Assist CLI not available');
+      console.log('[AIController] Gemini Code Assist CLI not available (or timed out)');
     }
   }
 
