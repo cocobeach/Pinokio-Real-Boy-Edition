@@ -742,19 +742,9 @@
       if (!window.electronAPI) return;
 
       try {
-        // Get current working directory from a typical location
-        const workingDir = process.cwd ? process.cwd() : null;
-        if (!workingDir) {
-          document.getElementById('git-content').innerHTML = `
-            <div class="empty-state">
-              <div class="icon">🔍</div>
-              <div>No working directory</div>
-            </div>
-          `;
-          return;
-        }
-
-        const gitStatus = await window.electronAPI.git.status({ path: workingDir });
+        // FIX: Do not use process.cwd() in renderer (security violation in Electron).
+        // Pass null to let backend decide default path (~/pinokio/api)
+        const gitStatus = await window.electronAPI.git.status({ path: null });
 
         if (!gitStatus.success || !gitStatus.status) {
           document.getElementById('git-content').innerHTML = `

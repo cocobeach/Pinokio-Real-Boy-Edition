@@ -386,6 +386,45 @@ Generate ONE commit message (just the message, no explanation):`;
   setupIpcHandlers(ipcRouter) {
     // Git status
     ipcRouter.handle('git:status', async (event, params) => {
+      // Support direct path or default to api root if no appName
+      if (params.path || !params.appName) {
+        const targetPath = params.path || path.join(os.homedir(), 'pinokio', 'api');
+
+        try {
+          // Check if path exists
+          if (!fs.existsSync(targetPath)) {
+            return { success: false, error: 'Path not found' };
+          }
+
+          // Check if it's a git repository
+          const git = simpleGit(targetPath);
+          const isRepo = await git.checkIsRepo();
+
+          if (!isRepo) {
+            return { success: false, error: 'Not a git repository' };
+          }
+
+          // Get git status
+          const status = await git.status();
+
+          return {
+            success: true,
+            isRepo: true,
+            status: {
+              branch: status.current,
+              staged: status.staged,
+              modified: status.modified,
+              untracked: status.not_added,
+              isClean: status.isClean()
+            }
+          };
+        } catch (error) {
+          console.error('[GitService] Error getting status for path:', error);
+          return { success: false, error: error.message };
+        }
+      }
+
+      // Original behavior: use appName
       return await this.getStatus(params.appName);
     });
 
